@@ -224,20 +224,3 @@ Vite 프록시가 `/api/**` 요청을 `localhost:8080`으로 전달합니다.
 7. **보상**: 승리 시 10~29G 랜덤 획득
 
 ---
-
-## 환경 설정 참고
-
-### application.yml (API 서버)
-```yaml
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/pgallbattle
-    username: pgall
-    password: 'pgall1234!@#$'
-```
-
-### 환경 변수
-```
-JAVA_HOME=C:\DEV\java\Amazon Corretto\jdk25.0.2
-PATH에 추가: C:\DEV\java\Amazon Corretto\jdk25.0.2\bin, C:\DEV\nodejs
-```
