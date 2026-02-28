@@ -9,9 +9,7 @@ RUN ./gradlew bootJar --no-daemon
 FROM amazoncorretto:21-alpine
 WORKDIR /app
 COPY --from=build /app/build/libs/*.jar app.jar
-COPY api/entrypoint.sh /app/entrypoint.sh
-COPY pgallbattle.db /app/pgallbattle.db.default
-RUN mkdir -p /data /app/logs && chmod +x /app/entrypoint.sh
+RUN mkdir -p /data /app/logs
 ENV SQLITE_PATH=/data/pgallbattle.db
 EXPOSE 8080
-ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["java", "--enable-native-access=ALL-UNNAMED", "-jar", "/app/app.jar"]
