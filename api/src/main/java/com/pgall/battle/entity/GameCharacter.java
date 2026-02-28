@@ -3,6 +3,7 @@ package com.pgall.battle.entity;
 import com.pgall.battle.enums.CharacterClass;
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +48,8 @@ public class GameCharacter {
     private int eloRate = 1000;
 
     private String ipAddress;
+
+    private LocalDate lastDailyGoldDate;
 
     @OneToMany(mappedBy = "character", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

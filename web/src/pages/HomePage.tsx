@@ -45,9 +45,10 @@ export default function HomePage() {
       )}
       {characters.map((c, i) => (
         <div className="card" key={c.id}
-          style={{ cursor: myId > 0 && myId !== c.id ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 10 }}
+          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}
           onClick={() => {
-            if (myId > 0 && myId !== c.id) navigate(`/battle/${myId}/${c.id}`);
+            if (c.id === myId) navigate(`/mypage/${myId}`);
+            else navigate(`/character/${c.id}`);
           }}>
           <div style={{
             width: 28, textAlign: 'center', fontWeight: 'bold', fontSize: '1rem',
@@ -75,7 +76,16 @@ export default function HomePage() {
             <div style={{ fontSize: '0.7rem', color: '#999' }}>ELO</div>
           </div>
           {myId > 0 && myId !== c.id && (
-            <div style={{ fontSize: '0.8rem', color: 'var(--red)' }}>⚔️</div>
+            <button style={{
+              background: 'var(--red)', color: '#fff', border: 'none', borderRadius: 6,
+              padding: '6px 12px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }} onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/battle/${myId}/${c.id}`);
+            }}>
+              ⚔️ 전투
+            </button>
           )}
         </div>
       ))}

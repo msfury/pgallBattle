@@ -69,6 +69,12 @@ public class CharacterController {
         return ResponseEntity.ok(Map.of("soldPrice", price));
     }
 
+    @PostMapping("/{id}/daily-check")
+    public ResponseEntity<Map<String, Object>> dailyCheck(@PathVariable Long id) {
+        boolean granted = characterService.checkAndGrantDailyGold(id);
+        return ResponseEntity.ok(Map.of("granted", granted, "amount", granted ? 300 : 0));
+    }
+
     @PutMapping("/{charId}/equipment/{equipId}/equip")
     public ResponseEntity<EquipmentResponse> equip(@PathVariable Long charId, @PathVariable Long equipId) {
         return ResponseEntity.ok(equipService.equip(charId, equipId));

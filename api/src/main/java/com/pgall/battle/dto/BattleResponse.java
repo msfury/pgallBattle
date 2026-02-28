@@ -22,4 +22,16 @@ public class BattleResponse {
     private String defenderClass;
     private int attackerMaxHp;
     private int defenderMaxHp;
+    private List<PotionInfo> attackerPotions;
+    private List<PotionInfo> defenderPotions;
+
+    @Getter @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class PotionInfo {
+        private String name;
+        private String buffType;
+        private int quantity;
+    }
 }

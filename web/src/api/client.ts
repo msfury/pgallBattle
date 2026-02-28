@@ -75,6 +75,12 @@ export interface ShopResponse {
   gold: number;
 }
 
+export interface PotionInfo {
+  name: string;
+  buffType: string;
+  quantity: number;
+}
+
 export interface BattleResult {
   winnerId: number;
   winnerName: string;
@@ -90,6 +96,8 @@ export interface BattleResult {
   defenderClass: string | null;
   attackerMaxHp: number;
   defenderMaxHp: number;
+  attackerPotions: PotionInfo[];
+  defenderPotions: PotionInfo[];
 }
 
 export const api = {
@@ -100,6 +108,8 @@ export const api = {
   getRanking: () => request<Character[]>('/characters/ranking'),
   getCharacter: (id: number) => request<Character>(`/characters/${id}`),
   getMyCharacter: () => request<Character>('/characters/mine'),
+  dailyCheck: (characterId: number) =>
+    request<{ granted: boolean; amount: number }>(`/characters/${characterId}/daily-check`, { method: 'POST' }),
   gacha: (characterId: number) =>
     request<Equipment>(`/gacha/${characterId}`, { method: 'POST' }),
   getShop: (characterId: number) =>

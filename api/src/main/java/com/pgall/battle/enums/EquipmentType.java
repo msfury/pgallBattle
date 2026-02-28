@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum EquipmentType {
-    WEAPON(1),
+    WEAPON(2),
     HELMET(1),
     ARMOR(1),
     GLOVES(1),
