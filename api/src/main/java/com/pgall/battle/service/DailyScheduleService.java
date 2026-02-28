@@ -10,6 +10,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -49,9 +50,11 @@ public class DailyScheduleService {
 
     @Transactional
     public void grantDailyGold() {
+        LocalDate today = LocalDate.now();
         List<GameCharacter> all = characterRepository.findAll();
         for (GameCharacter c : all) {
             c.setGold(c.getGold() + DAILY_GOLD);
+            c.setLastDailyGoldDate(today);
         }
         characterRepository.saveAll(all);
         log.info("전체 캐릭터 {}명에게 {}G 지급 완료.", all.size(), DAILY_GOLD);

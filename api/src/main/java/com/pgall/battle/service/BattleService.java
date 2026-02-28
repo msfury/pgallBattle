@@ -75,9 +75,11 @@ public class BattleService {
         Set<BuffType> atkBuffsUsed = new HashSet<>();
         Set<BuffType> defBuffsUsed = new HashSet<>();
 
-        // 보유 물약 표시
+        // 보유 물약 표시 + 정보 수집
         showPotions(atkPotions, attacker.getName(), log);
         showPotions(defPotions, defender.getName(), log);
+        List<BattleResponse.PotionInfo> atkPotionInfos = buildPotionInfos(atkPotions);
+        List<BattleResponse.PotionInfo> defPotionInfos = buildPotionInfos(defPotions);
 
         // 장비 효과 수집 (effectChance → 발동확률, effectValue → 수치)
         Map<EquipmentEffect, int[]> atkEffects = collectEffects(attacker);
@@ -280,6 +282,15 @@ public class BattleService {
             round++;
         }
 
+        // 물약 소모 저장
+        List<Inventory> allPotions = new ArrayList<>();
+        allPotions.addAll(atkPotions);
+        allPotions.addAll(defPotions);
+        List<Inventory> depleted = allPotions.stream().filter(inv -> inv.getQuantity() <= 0).toList();
+        List<Inventory> remaining = allPotions.stream().filter(inv -> inv.getQuantity() > 0).toList();
+        if (!remaining.isEmpty()) inventoryRepository.saveAll(remaining);
+        if (!depleted.isEmpty()) inventoryRepository.deleteAll(depleted);
+
         // 결과
         GameCharacter winner, loser;
         if (defHp <= 0) { winner = attacker; loser = defender; }
@@ -332,7 +343,19 @@ public class BattleService {
                 .attackerClass(attacker.getCharacterClass() != null ? attacker.getCharacterClass().name() : null)
                 .defenderClass(defender.getCharacterClass() != null ? defender.getCharacterClass().name() : null)
                 .attackerMaxHp(atkMaxHp).defenderMaxHp(defMaxHp)
+                .attackerPotions(atkPotionInfos).defenderPotions(defPotionInfos)
                 .build();
+    }
+
+    private List<BattleResponse.PotionInfo> buildPotionInfos(List<Inventory> potions) {
+        return potions.stream()
+                .filter(inv -> inv.getQuantity() > 0 && inv.getShopItem() != null)
+                .map(inv -> BattleResponse.PotionInfo.builder()
+                        .name(inv.getShopItem().getName())
+                        .buffType(inv.getShopItem().getBuffType().name())
+                        .quantity(inv.getQuantity())
+                        .build())
+                .toList();
     }
 
     /** 한 캐릭터의 턴 처리 */

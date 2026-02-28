@@ -14,6 +14,7 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/create" element={<CharacterCreatePage />} />
           <Route path="/mypage/:id" element={<MyPage />} />
+          <Route path="/character/:id" element={<MyPage />} />
           <Route path="/shop/:id" element={<ShopPage />} />
           <Route path="/gacha/:id" element={<GachaPage />} />
           <Route path="/battle/:attackerId/:defenderId" element={<BattlePage />} />

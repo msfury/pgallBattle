@@ -14,8 +14,13 @@ export default function BattlePage() {
   const [battleFinished, setBattleFinished] = useState(false);
   const [error, setError] = useState('');
   const logEndRef = useRef<HTMLDivElement>(null);
+  const battleStarted = useRef(false);
 
-  useEffect(() => { startBattle(); }, []);
+  useEffect(() => {
+    if (battleStarted.current) return;
+    battleStarted.current = true;
+    startBattle();
+  }, []);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -77,6 +82,8 @@ export default function BattlePage() {
           winnerId={result.winnerId}
           attackerId={Number(attackerId)}
           defenderId={Number(defenderId)}
+          attackerPotions={result.attackerPotions}
+          defenderPotions={result.defenderPotions}
         />
       )}
 

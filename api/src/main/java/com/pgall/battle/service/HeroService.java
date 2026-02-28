@@ -25,9 +25,10 @@ public class HeroService {
     private static final int DAILY_GACHA_COUNT = 5;
     private static final int HERO_GOLD = 10000;
 
-    // 슬롯 구성: WEAPON x1, HELMET x1, ARMOR x1, GLOVES x1, SHOES x1, EARRING x2, RING x2
+    // 슬롯 구성: WEAPON x2, HELMET x1, ARMOR x1, GLOVES x1, SHOES x1, EARRING x2, RING x2
     private static final List<EquipmentType> ALL_SLOT_TYPES = List.of(
-            EquipmentType.WEAPON, EquipmentType.HELMET, EquipmentType.ARMOR,
+            EquipmentType.WEAPON, EquipmentType.WEAPON,
+            EquipmentType.HELMET, EquipmentType.ARMOR,
             EquipmentType.GLOVES, EquipmentType.SHOES,
             EquipmentType.EARRING, EquipmentType.EARRING,
             EquipmentType.RING, EquipmentType.RING
@@ -64,6 +65,10 @@ public class HeroService {
 
         log.info("용사 일일 가챠 시작 ({}명)...", heroes.size());
         for (GameCharacter hero : heroes) {
+            // 아바타 수정 (구 숫자 ID → 클래스별 아바타)
+            if (hero.getAvatar() == null || !hero.getAvatar().contains("_")) {
+                hero.setAvatar(pickAvatarForClass(hero.getCharacterClass(), ThreadLocalRandom.current()));
+            }
             // 5번 가챠
             for (int i = 0; i < DAILY_GACHA_COUNT; i++) {
                 gachaService.pullFree(hero);
@@ -80,7 +85,7 @@ public class HeroService {
         ThreadLocalRandom random = ThreadLocalRandom.current();
         GameCharacter hero = GameCharacter.builder()
                 .name(charClass.getKoreanName() + " " + HERO_SUFFIX)
-                .avatar(String.valueOf(random.nextInt(1, 13)))
+                .avatar(pickAvatarForClass(charClass, random))
                 .characterClass(charClass)
                 .ipAddress(HERO_IP_PREFIX + index)
                 .strength(roll4d6DropLowest(random))
@@ -137,14 +142,20 @@ public class HeroService {
 
         // 슬롯별 장착
         Map<EquipmentType, Integer> equipped = new HashMap<>();
+        boolean hasTwoHandedWeapon = false;
         for (EquipmentType slotType : ALL_SLOT_TYPES) {
             int count = equipped.getOrDefault(slotType, 0);
+            // 양손무기가 장착되어 있으면 두번째 무기 슬롯 스킵
+            if (slotType == EquipmentType.WEAPON && hasTwoHandedWeapon) continue;
             List<Equipment> candidates = byType.getOrDefault(slotType, List.of());
             if (count < candidates.size()) {
                 Equipment best = candidates.get(count);
+                // 양손무기인데 이미 한손무기가 장착되어 있으면 스킵
+                if (slotType == EquipmentType.WEAPON && best.isTwoHanded() && count > 0) continue;
                 best.setEquipped(true);
                 equipmentRepository.save(best);
                 equipped.put(slotType, count + 1);
+                if (slotType == EquipmentType.WEAPON && best.isTwoHanded()) hasTwoHandedWeapon = true;
             }
         }
     }
@@ -175,6 +186,22 @@ public class HeroService {
     private void deleteUnequipped(GameCharacter hero) {
         List<Equipment> unequipped = equipmentRepository.findByCharacterIdAndEquipped(hero.getId(), false);
         equipmentRepository.deleteAll(unequipped);
+    }
+
+    private String pickAvatarForClass(CharacterClass charClass, ThreadLocalRandom random) {
+        return switch (charClass) {
+            case WARRIOR -> {
+                String[] options = {"warrior_1", "warrior_2", "warrior_3"};
+                yield options[random.nextInt(options.length)];
+            }
+            case MAGE -> "mage_1";
+            case RANGER -> {
+                String[] options = {"ranger_1", "ranger_2"};
+                yield options[random.nextInt(options.length)];
+            }
+            case ROGUE -> "rogue_1";
+            case CLERIC -> "cleric_1";
+        };
     }
 
     private int roll4d6DropLowest(ThreadLocalRandom random) {

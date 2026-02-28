@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -100,6 +101,20 @@ public class CharacterService {
 
         // 캐릭터 삭제 (equipment는 cascade로 자동 삭제)
         characterRepository.delete(character);
+    }
+
+    @Transactional
+    public boolean checkAndGrantDailyGold(Long characterId) {
+        GameCharacter character = characterRepository.findById(characterId)
+                .orElseThrow(() -> new NoSuchElementException("캐릭터를 찾을 수 없습니다."));
+        LocalDate today = LocalDate.now();
+        if (today.equals(character.getLastDailyGoldDate())) {
+            return false;
+        }
+        character.setGold(character.getGold() + 300);
+        character.setLastDailyGoldDate(today);
+        characterRepository.save(character);
+        return true;
     }
 
     private int roll4d6DropLowest() {

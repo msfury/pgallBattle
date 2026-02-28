@@ -42,7 +42,8 @@ const TYPE_EMOJI: Record<string, string> = {
 };
 
 const SLOT_LAYOUT = [
-  { type: 'WEAPON', label: '무기' },
+  { type: 'WEAPON', label: '무기 1' },
+  { type: 'WEAPON', label: '무기 2' },
   { type: 'HELMET', label: '투구' },
   { type: 'ARMOR', label: '갑옷' },
   { type: 'GLOVES', label: '장갑' },
@@ -61,6 +62,8 @@ export default function MyPage() {
   const [char, setChar] = useState<Character | null>(null);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
+  const [isOwner, setIsOwner] = useState(false);
+  const [myCharId, setMyCharId] = useState<number | null>(null);
 
   const loadChar = useCallback(() => api.getCharacter(myId).then(setChar).catch(e => {
     setError(e instanceof Error ? e.message : '로딩 실패');
@@ -68,17 +71,31 @@ export default function MyPage() {
 
   useEffect(() => { loadChar(); }, [loadChar]);
 
-  // 일급 토스트: 매일 첫 접속 시 알림
+  // 소유권 확인
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const key = `dailyGold_${myId}`;
-    if (localStorage.getItem(key) !== today) {
-      localStorage.setItem(key, today);
-      setToast('오늘 일급이 발급되었어요! +300G');
-      const timer = setTimeout(() => setToast(''), 4000);
-      return () => clearTimeout(timer);
-    }
+    api.getMyCharacter()
+      .then(c => {
+        setMyCharId(c.id);
+        setIsOwner(c.id === myId);
+      })
+      .catch(() => {
+        setIsOwner(false);
+        setMyCharId(null);
+      });
   }, [myId]);
+
+  // 일급 토스트: 소유자만 서버에서 일급 지급 여부 확인
+  useEffect(() => {
+    if (!isOwner) return;
+    api.dailyCheck(myId).then(res => {
+      if (res.granted) {
+        setToast(`오늘 일급이 발급되었어요! +${res.amount}G`);
+        loadChar();
+        const timer = setTimeout(() => setToast(''), 4000);
+        return () => clearTimeout(timer);
+      }
+    }).catch(() => {});
+  }, [myId, isOwner]);
 
   const handleEquip = async (equipId: number) => {
     try {
@@ -172,10 +189,19 @@ export default function MyPage() {
       </div>
 
       {/* 네비게이션 */}
-      <div className="flex-row mb-12">
-        <button className="btn-gold" onClick={() => navigate(`/shop/${myId}`)}>🏪 상점</button>
-        <button className="btn-blue" onClick={() => navigate(`/gacha/${myId}`)}>🎰 가챠</button>
-      </div>
+      {isOwner && (
+        <div className="flex-row mb-12">
+          <button className="btn-gold" onClick={() => navigate(`/shop/${myId}`)}>🏪 상점</button>
+          <button className="btn-blue" onClick={() => navigate(`/gacha/${myId}`)}>🎰 가챠</button>
+        </div>
+      )}
+      {!isOwner && myCharId && (
+        <div className="flex-row mb-12">
+          <button className="btn-red" onClick={() => navigate(`/battle/${myCharId}/${myId}`)}>
+            ⚔️ 전투하기
+          </button>
+        </div>
+      )}
 
       {/* 능력치 */}
       <div className="card mb-12">
@@ -216,8 +242,10 @@ export default function MyPage() {
                         [{EFFECT_NAMES[item.effect] || item.effect} {item.effectChance}%]
                       </div>
                     )}
-                    <button className="btn-sm btn-red" style={{ marginTop: 4 }}
-                      onClick={() => handleUnequip(item.id)}>해제</button>
+                    {isOwner && (
+                      <button className="btn-sm btn-red" style={{ marginTop: 4 }}
+                        onClick={() => handleUnequip(item.id)}>해제</button>
+                    )}
                   </div>
                 ) : (
                   <div className="slot-empty">비어있음</div>
@@ -228,61 +256,65 @@ export default function MyPage() {
         </div>
       </div>
 
-      {/* 인벤토리 */}
-      <div className="card mb-12">
-        <h2>인벤토리 ({unequippedItems.length})</h2>
-        {unequippedItems.length === 0 && (
-          <p style={{ color: '#999', fontSize: '0.9rem' }}>미장착 장비가 없습니다</p>
-        )}
-        {unequippedItems.map(eq => (
-          <div key={eq.id} style={{
-            padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          }}>
-            <div>
-              <span className={GRADE_CLASS[eq.grade]}>{TYPE_EMOJI[eq.type] || ''} {eq.name}</span>
-              {eq.twoHanded && <span style={{ fontSize: '0.65rem', color: '#999', marginLeft: 4 }}>(양손)</span>}
-              <div style={{ fontSize: '0.75rem', color: '#999', marginTop: 2 }}>
-                {eq.attackBonus > 0 && <span style={{ color: '#e74c3c' }}>ATK+{eq.attackBonus} </span>}
-                {eq.defenseBonus > 0 && <span style={{ color: '#3498db' }}>DEF+{eq.defenseBonus} </span>}
-                {eq.type === 'WEAPON' && eq.baseDamageMax > 0 && (
-                  <span style={{ color: '#f39c12' }}>DMG:{eq.baseDamageMin}-{eq.baseDamageMax} </span>
-                )}
-                {eq.effect && (
-                  <span style={{ color: '#f39c12' }}>[{EFFECT_NAMES[eq.effect] || eq.effect} {eq.effectChance}%]</span>
-                )}
+      {/* 인벤토리 - 소유자만 */}
+      {isOwner && (
+        <div className="card mb-12">
+          <h2>인벤토리 ({unequippedItems.length})</h2>
+          {unequippedItems.length === 0 && (
+            <p style={{ color: '#999', fontSize: '0.9rem' }}>미장착 장비가 없습니다</p>
+          )}
+          {unequippedItems.map(eq => (
+            <div key={eq.id} style={{
+              padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <div>
+                <span className={GRADE_CLASS[eq.grade]}>{TYPE_EMOJI[eq.type] || ''} {eq.name}</span>
+                {eq.twoHanded && <span style={{ fontSize: '0.65rem', color: '#999', marginLeft: 4 }}>(양손)</span>}
+                <div style={{ fontSize: '0.75rem', color: '#999', marginTop: 2 }}>
+                  {eq.attackBonus > 0 && <span style={{ color: '#e74c3c' }}>ATK+{eq.attackBonus} </span>}
+                  {eq.defenseBonus > 0 && <span style={{ color: '#3498db' }}>DEF+{eq.defenseBonus} </span>}
+                  {eq.type === 'WEAPON' && eq.baseDamageMax > 0 && (
+                    <span style={{ color: '#f39c12' }}>DMG:{eq.baseDamageMin}-{eq.baseDamageMax} </span>
+                  )}
+                  {eq.effect && (
+                    <span style={{ color: '#f39c12' }}>[{EFFECT_NAMES[eq.effect] || eq.effect} {eq.effectChance}%]</span>
+                  )}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <button className="btn-sm btn-green" onClick={() => handleEquip(eq.id)}>장착</button>
+                <button className="btn-sm" style={{
+                  background: '#e67e22', color: '#fff', border: 'none', cursor: 'pointer',
+                  padding: '4px 8px', borderRadius: 4, fontSize: '0.7rem',
+                }} onClick={() => handleSell(eq)}>
+                  판매 {SELL_PRICE[eq.grade] || 5}G
+                </button>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-              <button className="btn-sm btn-green" onClick={() => handleEquip(eq.id)}>장착</button>
-              <button className="btn-sm" style={{
-                background: '#e67e22', color: '#fff', border: 'none', cursor: 'pointer',
-                padding: '4px 8px', borderRadius: 4, fontSize: '0.7rem',
-              }} onClick={() => handleSell(eq)}>
-                판매 {SELL_PRICE[eq.grade] || 5}G
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {error && <p className="error mb-12">{error}</p>}
 
-      {/* 캐릭터 삭제 */}
-      <div className="card mb-12" style={{ borderColor: 'rgba(231,76,60,0.3)' }}>
-        <button className="btn-full btn-red" onClick={async () => {
-          if (!confirm(`정말 "${char.name}" 캐릭터를 삭제하시겠습니까?\n모든 장비, 아이템, 전투 기록이 삭제됩니다.`)) return;
-          try {
-            await api.deleteCharacter(myId);
-            localStorage.removeItem('myCharId');
-            navigate('/create');
-          } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : '삭제 실패');
-          }
-        }}>
-          캐릭터 삭제
-        </button>
-      </div>
+      {/* 캐릭터 삭제 - 소유자만 */}
+      {isOwner && (
+        <div className="card mb-12" style={{ borderColor: 'rgba(231,76,60,0.3)' }}>
+          <button className="btn-full btn-red" onClick={async () => {
+            if (!confirm(`정말 "${char.name}" 캐릭터를 삭제하시겠습니까?\n모든 장비, 아이템, 전투 기록이 삭제됩니다.`)) return;
+            try {
+              await api.deleteCharacter(myId);
+              localStorage.removeItem('myCharId');
+              navigate('/create');
+            } catch (e: unknown) {
+              setError(e instanceof Error ? e.message : '삭제 실패');
+            }
+          }}>
+            캐릭터 삭제
+          </button>
+        </div>
+      )}
     </div>
   );
 }
