@@ -23,7 +23,9 @@ export default function SpriteAvatar({
   const avatar = getAvatarById(avatarId);
   const [frame, setFrame] = useState(0);
 
-  const anim = SPRITE.animations[animation] || SPRITE.animations.idle;
+  const sprite = avatar?.sprite || SPRITE;
+  const anim = sprite.animations[animation] || sprite.animations.idle;
+  const s = scale * sprite.baseScale;
 
   useEffect(() => {
     if (paused) {
@@ -45,19 +47,19 @@ export default function SpriteAvatar({
 
   const col = anim.startCol + frame;
   const row = avatar.row;
-  const bgX = -(col * SPRITE.cellWidth);
-  const bgY = -(row * SPRITE.cellHeight);
-  const displayW = SPRITE.cellWidth * scale;
-  const displayH = SPRITE.cellHeight * scale;
+  const bgX = -(col * sprite.cellWidth);
+  const bgY = -(row * sprite.cellHeight);
+  const displayW = sprite.cellWidth * s;
+  const displayH = sprite.cellHeight * s;
 
   return (
     <div
       style={{
         width: displayW,
         height: displayH,
-        backgroundImage: `url(${SPRITE.src})`,
-        backgroundPosition: `${bgX * scale}px ${bgY * scale}px`,
-        backgroundSize: `${SPRITE.sheetWidth * scale}px ${SPRITE.sheetHeight * scale}px`,
+        backgroundImage: `url(${sprite.src})`,
+        backgroundPosition: `${bgX * s}px ${bgY * s}px`,
+        backgroundSize: `${sprite.sheetWidth * s}px ${sprite.sheetHeight * s}px`,
         backgroundRepeat: 'no-repeat',
         imageRendering: 'pixelated',
         transform: flip ? 'scaleX(-1)' : undefined,
