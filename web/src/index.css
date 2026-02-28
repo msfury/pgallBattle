@@ -1,0 +1,149 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --primary: #6c5ce7;
+  --primary-dark: #5a4bd1;
+  --bg: #1a1a2e;
+  --bg-card: #16213e;
+  --bg-card-hover: #1a2745;
+  --text: #eee;
+  --text-dim: #999;
+  --gold: #ffd700;
+  --red: #e74c3c;
+  --green: #2ecc71;
+  --blue: #3498db;
+  --orange: #f39c12;
+  --purple: #9b59b6;
+
+  --grade-common: #aaa;
+  --grade-uncommon: #2ecc71;
+  --grade-rare: #3498db;
+  --grade-epic: #9b59b6;
+  --grade-legendary: #f39c12;
+}
+
+/* Dark scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+* { scrollbar-color: rgba(255,255,255,0.15) rgba(255,255,255,0.03); scrollbar-width: thin; }
+
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.app {
+  padding: 16px;
+  padding-bottom: 32px;
+}
+
+h1 { font-size: 1.4rem; text-align: center; margin-bottom: 16px; }
+h2 { font-size: 1.1rem; margin-bottom: 12px; }
+
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: white;
+  background: var(--primary);
+}
+button:hover { background: var(--primary-dark); transform: translateY(-1px); }
+button:active { transform: translateY(0); }
+button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.btn-full { width: 100%; padding: 14px; font-size: 1rem; }
+.btn-gold { background: linear-gradient(135deg, #f39c12, #e67e22); }
+.btn-red { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+.btn-green { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+.btn-blue { background: linear-gradient(135deg, #3498db, #2980b9); }
+.btn-sm { padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; }
+
+.card { background: var(--bg-card); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+.card:hover { background: var(--bg-card-hover); }
+
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.stat-item { display: flex; justify-content: space-between; padding: 6px 10px; background: rgba(255,255,255,0.05); border-radius: 6px; }
+.stat-label { color: var(--text-dim); }
+.stat-value { font-weight: bold; }
+
+.gold { color: var(--gold); }
+.flex-row { display: flex; gap: 8px; }
+.flex-row > * { flex: 1; }
+
+.mb-8 { margin-bottom: 8px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-16 { margin-bottom: 16px; }
+.mt-12 { margin-top: 12px; }
+.mt-16 { margin-top: 16px; }
+.text-center { text-align: center; }
+
+.grade-common { color: var(--grade-common); }
+.grade-uncommon { color: var(--grade-uncommon); }
+.grade-rare { color: var(--grade-rare); }
+.grade-epic { color: var(--grade-epic); }
+.grade-legendary { color: var(--grade-legendary); }
+
+.error { color: var(--red); text-align: center; padding: 8px; }
+.back-btn { background: transparent; color: var(--text-dim); padding: 4px 8px; font-size: 0.85rem; margin-bottom: 12px; }
+
+input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  font-size: 1rem;
+  outline: none;
+}
+input:focus { border-color: var(--primary); }
+
+/* Equipment slots grid */
+.equip-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.equip-slot { background: rgba(255,255,255,0.03); border: 1px dashed rgba(255,255,255,0.1); border-radius: 8px; padding: 8px; text-align: center; min-height: 60px; display: flex; flex-direction: column; justify-content: center; }
+.equip-slot.filled { border-color: var(--primary); border-style: solid; }
+.slot-label { font-size: 0.7rem; color: var(--text-dim); margin-bottom: 4px; }
+.slot-empty { color: rgba(255,255,255,0.2); font-size: 0.75rem; }
+
+/* Battle Arena */
+.battle-arena { display: flex; justify-content: space-between; align-items: flex-start; padding: 16px 8px; position: relative; overflow: hidden; min-height: 200px; }
+.arena-fighter { display: flex; flex-direction: column; align-items: center; width: 40%; z-index: 2; }
+.arena-vs { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); font-size: 1.2rem; font-weight: bold; color: var(--text-dim); z-index: 1; }
+.arena-avatar-wrap { position: relative; transition: transform 0.3s ease; }
+.arena-head { font-size: 2.5rem; line-height: 1; }
+.arena-body-box { width: 40px; height: 50px; border-radius: 6px 6px 4px 4px; margin: -4px auto 0; position: relative; }
+.arena-legs { display: flex; gap: 4px; justify-content: center; margin-top: 2px; }
+.arena-leg { width: 8px; height: 20px; border-radius: 0 0 4px 4px; }
+.arena-weapon { position: absolute; right: -16px; top: 10px; font-size: 1.2rem; }
+.arena-name { font-size: 0.8rem; font-weight: bold; margin-top: 6px; white-space: nowrap; }
+.arena-class-badge { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; margin-top: 2px; }
+.hp-bar { width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.hp-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+.hp-text { font-size: 0.65rem; color: var(--text-dim); margin-top: 2px; }
+
+/* Effects */
+.arena-effect { position: absolute; left: 50%; top: 40%; transform: translate(-50%,-50%); font-size: 2rem; z-index: 10; pointer-events: none; opacity: 0; }
+.arena-effect.show { animation: effectPop 0.6s ease forwards; }
+
+/* Animations */
+@keyframes attackLeft { 0%{transform:translateX(0)} 30%{transform:translateX(60px)} 60%{transform:translateX(60px)} 100%{transform:translateX(0)} }
+@keyframes attackRight { 0%{transform:translateX(0)} 30%{transform:translateX(-60px)} 60%{transform:translateX(-60px)} 100%{transform:translateX(0)} }
+@keyframes dodge { 0%{transform:translateX(0)} 25%{transform:translateX(-10px)} 50%{transform:translateX(10px)} 75%{transform:translateX(-5px)} 100%{transform:translateX(0)} }
+@keyframes shake { 0%{transform:translate(0)} 20%{transform:translate(-3px,2px)} 40%{transform:translate(3px,-2px)} 60%{transform:translate(-2px,3px)} 80%{transform:translate(2px,-1px)} 100%{transform:translate(0)} }
+@keyframes effectPop { 0%{opacity:0;transform:translate(-50%,-50%) scale(0.5)} 30%{opacity:1;transform:translate(-50%,-50%) scale(1.3)} 100%{opacity:0;transform:translate(-50%,-80%) scale(0.8)} }
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+@keyframes healGlow { 0%{box-shadow:0 0 0 rgba(46,204,113,0)} 50%{box-shadow:0 0 20px rgba(46,204,113,0.5)} 100%{box-shadow:0 0 0 rgba(46,204,113,0)} }

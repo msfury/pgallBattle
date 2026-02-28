@@ -1,0 +1,21 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Build
+api/build/
+api/.gradle/
+web/dist/
+web/node_modules/
+
+# Logs
+api/logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+*.local

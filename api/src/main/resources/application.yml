@@ -1,0 +1,34 @@
+spring:
+  datasource:
+    url: jdbc:sqlite:D:/data/pgallBattle/pgallbattle.db?busy_timeout=5000&journal_mode=WAL
+    driver-class-name: org.sqlite.JDBC
+    hikari:
+      maximum-pool-size: 1
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    defer-datasource-initialization: true
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.community.dialect.SQLiteDialect
+  sql:
+    init:
+      mode: always
+
+server:
+  port: 8080
+
+logging:
+  file:
+    name: logs/pgallbattle.log
+  level:
+    root: INFO
+    com.pgall.battle: DEBUG
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%level] %logger{36} - %msg%n"
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 7
