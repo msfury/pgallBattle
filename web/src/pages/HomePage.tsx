@@ -8,12 +8,20 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [error, setError] = useState('');
-  const myId = Number(localStorage.getItem('myCharId') || 0);
+  const [myId, setMyId] = useState(Number(localStorage.getItem('myCharId') || 0));
 
   useEffect(() => {
     api.getRanking()
       .then(setCharacters)
       .catch(e => setError(e instanceof Error ? e.message : '로딩 실패'));
+
+    // 저장된 캐릭터가 실제로 존재하는지 확인
+    if (myId > 0) {
+      api.getCharacter(myId).catch(() => {
+        localStorage.removeItem('myCharId');
+        setMyId(0);
+      });
+    }
   }, []);
 
   return (

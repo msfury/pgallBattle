@@ -112,6 +112,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ attackerId, defenderId }),
     }),
+  deleteCharacter: (id: number) =>
+    request<void>(`/characters/${id}`, { method: 'DELETE' }),
   equipItem: (characterId: number, equipmentId: number) =>
     request<Equipment>(`/characters/${characterId}/equipment/${equipmentId}/equip`, { method: 'PUT' }),
   unequipItem: (characterId: number, equipmentId: number) =>
