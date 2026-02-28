@@ -5,4 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface GameCharacterRepository extends JpaRepository<GameCharacter, Long> {
     java.util.List<GameCharacter> findAllByOrderByEloRateDesc();
+    java.util.List<GameCharacter> findByNameContaining(String keyword);
+    java.util.Optional<GameCharacter> findByIpAddress(String ipAddress);
 }

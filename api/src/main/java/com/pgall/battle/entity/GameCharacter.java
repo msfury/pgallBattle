@@ -46,6 +46,8 @@ public class GameCharacter {
     @Builder.Default
     private int eloRate = 1000;
 
+    private String ipAddress;
+
     @OneToMany(mappedBy = "character", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Equipment> equipments = new ArrayList<>();

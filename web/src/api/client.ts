@@ -99,6 +99,7 @@ export const api = {
   getCharacters: () => request<Character[]>('/characters'),
   getRanking: () => request<Character[]>('/characters/ranking'),
   getCharacter: (id: number) => request<Character>(`/characters/${id}`),
+  getMyCharacter: () => request<Character>('/characters/mine'),
   gacha: (characterId: number) =>
     request<Equipment>(`/gacha/${characterId}`, { method: 'POST' }),
   getShop: (characterId: number) =>
@@ -114,6 +115,8 @@ export const api = {
     }),
   deleteCharacter: (id: number) =>
     request<void>(`/characters/${id}`, { method: 'DELETE' }),
+  sellEquipment: (characterId: number, equipmentId: number) =>
+    request<{ soldPrice: number }>(`/characters/${characterId}/equipment/${equipmentId}/sell`, { method: 'POST' }),
   equipItem: (characterId: number, equipmentId: number) =>
     request<Equipment>(`/characters/${characterId}/equipment/${equipmentId}/equip`, { method: 'PUT' }),
   unequipItem: (characterId: number, equipmentId: number) =>

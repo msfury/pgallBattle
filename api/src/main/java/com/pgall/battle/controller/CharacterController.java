@@ -1,14 +1,17 @@
 package com.pgall.battle.controller;
 
 import com.pgall.battle.dto.*;
+import com.pgall.battle.filter.IpOwnershipFilter;
 import com.pgall.battle.service.CharacterService;
 import com.pgall.battle.service.EquipService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/characters")
@@ -25,8 +28,17 @@ public class CharacterController {
     }
 
     @PostMapping
-    public ResponseEntity<CharacterResponse> create(@Valid @RequestBody CharacterCreateRequest request) {
-        return ResponseEntity.ok(characterService.createCharacter(request));
+    public ResponseEntity<CharacterResponse> create(@Valid @RequestBody CharacterCreateRequest request,
+                                                     HttpServletRequest httpRequest) {
+        String ip = IpOwnershipFilter.extractIp(httpRequest);
+        return ResponseEntity.ok(characterService.createCharacter(request, ip));
+    }
+
+    /** 내 IP로 생성된 캐릭터 조회 */
+    @GetMapping("/mine")
+    public ResponseEntity<CharacterResponse> mine(HttpServletRequest httpRequest) {
+        String ip = IpOwnershipFilter.extractIp(httpRequest);
+        return ResponseEntity.ok(characterService.getMyCharacter(ip));
     }
 
     @GetMapping
@@ -49,6 +61,12 @@ public class CharacterController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         characterService.deleteCharacter(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{charId}/equipment/{equipId}/sell")
+    public ResponseEntity<Map<String, Object>> sell(@PathVariable Long charId, @PathVariable Long equipId) {
+        int price = equipService.sell(charId, equipId);
+        return ResponseEntity.ok(Map.of("soldPrice", price));
     }
 
     @PutMapping("/{charId}/equipment/{equipId}/equip")

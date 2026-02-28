@@ -155,6 +155,11 @@ public class ShopService {
         }
     }
 
+    /** 매일 0시: 모든 세션 초기화 → refreshCount=0, 가격 5G로 리셋 */
+    public void resetSessions() {
+        sessions.clear();
+    }
+
     private ShopSession generateSession() {
         ShopSession session = new ShopSession();
         ThreadLocalRandom random = ThreadLocalRandom.current();

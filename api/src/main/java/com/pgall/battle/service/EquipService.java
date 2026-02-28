@@ -68,6 +68,29 @@ public class EquipService {
     }
 
     @Transactional
+    public int sell(Long characterId, Long equipmentId) {
+        GameCharacter character = characterRepository.findById(characterId)
+                .orElseThrow(() -> new NoSuchElementException("캐릭터를 찾을 수 없습니다."));
+        Equipment equipment = equipmentRepository.findById(equipmentId)
+                .orElseThrow(() -> new NoSuchElementException("장비를 찾을 수 없습니다."));
+
+        if (!equipment.getCharacter().getId().equals(characterId)) {
+            throw new IllegalArgumentException("이 캐릭터의 장비가 아닙니다.");
+        }
+
+        if (equipment.isEquipped()) {
+            throw new IllegalStateException("장착 중인 장비는 판매할 수 없습니다. 먼저 해제하세요.");
+        }
+
+        int price = equipment.getGrade().getSellPrice();
+        character.setGold(character.getGold() + price);
+        character.getEquipments().remove(equipment);
+        equipmentRepository.delete(equipment);
+        characterRepository.save(character);
+        return price;
+    }
+
+    @Transactional
     public EquipmentResponse unequip(Long characterId, Long equipmentId) {
         Equipment equipment = equipmentRepository.findById(equipmentId)
                 .orElseThrow(() -> new NoSuchElementException("장비를 찾을 수 없습니다."));
