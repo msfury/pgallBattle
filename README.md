@@ -1,51 +1,21 @@
-# pgallBattle - D&D 스타일 캐릭터 배틀 게임
+# pgallBattle
 
-캐릭터를 생성하고, 장비를 가챠로 뽑고, 상점에서 전투 아이템을 구매하고, 다른 캐릭터와 D&D 룰 기반 전투를 하는 모바일 웹 게임.
-
----
-
-## 빠른 시작
-
-### API 서버
-```bash
-cd api
-./gradlew bootRun          # 실행 (http://localhost:8080)
-# 종료: Ctrl+C (포그라운드) 또는 터미널 닫기
-```
-
-### React 개발서버
-```bash
-cd web
-npm install                # 최초 1회
-npm run dev                # 실행 (http://localhost:5173)
-# 종료: Ctrl+C (포그라운드) 또는 터미널 닫기
-```
-
-### 서버 강제 종료 (포트로 찾기)
-```bash
-# Windows
-netstat -ano | findstr :8080     # PID 확인
-taskkill /PID <PID번호> /F       # API 서버 종료
-
-netstat -ano | findstr :5173     # PID 확인
-taskkill /PID <PID번호> /F       # React 서버 종료
-```
+D&D 5e 룰 기반 캐릭터 배틀 웹게임. 캐릭터를 생성하고, 장비를 가챠로 뽑고, 물약을 구매해서 다른 플레이어와 PvP 전투를 벌인다.
 
 ---
 
 ## 기술 스택
 
-| 구분 | 기술 | 버전 |
-|------|------|------|
-| API 서버 | Spring Boot | 4.0.3 |
-| 언어 (API) | Java (Amazon Corretto) | 25 |
-| 빌드 도구 | Gradle | 9.3.1 |
-| ORM | JPA / Hibernate | 7.2.4 |
-| 보일러플레이트 | Lombok | 1.18.40 |
-| 데이터베이스 | PostgreSQL | 17 |
-| 프론트엔드 | React + TypeScript | 18 |
-| 번들러 | Vite | 7.3 |
-| 라우팅 | React Router | 7.x |
+| 구분 | 기술 |
+|------|------|
+| API 서버 | Spring Boot 4.0.3 / Java 21 |
+| 빌드 | Gradle 9.3.1 |
+| ORM | JPA / Hibernate |
+| DB | SQLite (WAL mode) |
+| 프론트엔드 | React 19 + TypeScript |
+| 번들러 | Vite 7.3 |
+| 라우팅 | React Router 7.x |
+| 배포 | Docker Compose |
 
 ---
 
@@ -53,51 +23,45 @@ taskkill /PID <PID번호> /F       # React 서버 종료
 
 ```
 pgallBattle/
-├── api/                                    # Spring Boot API 서버
+├── api/                                     # Spring Boot API
+│   ├── Dockerfile
 │   ├── build.gradle
-│   ├── settings.gradle
-│   ├── gradlew / gradlew.bat
 │   └── src/main/java/com/pgall/battle/
-│       ├── PgallBattleApplication.java     # 메인 엔트리
-│       ├── config/
-│       │   ├── CorsConfig.java             # CORS 설정
-│       │   └── GlobalExceptionHandler.java # 전역 에러 핸들러
-│       ├── entity/
-│       │   ├── GameCharacter.java          # 캐릭터
-│       │   ├── Equipment.java              # 장비 (가챠)
-│       │   ├── ShopItem.java               # 상점 아이템
-│       │   ├── Inventory.java              # 캐릭터 보유 아이템
-│       │   └── BattleLog.java              # 전투 기록
-│       ├── enums/
-│       │   ├── EquipmentType.java          # WEAPON, HELMET, ARMOR, SHOES, EARRING, RING
-│       │   ├── EquipmentGrade.java         # COMMON ~ LEGENDARY
-│       │   ├── EquipmentEffect.java        # 장비 특수효과
-│       │   └── BuffType.java               # 상점 아이템 버프
-│       ├── repository/                     # JPA Repository (5개)
-│       ├── service/
-│       │   ├── CharacterService.java       # 캐릭터 생성/조회, 스탯 롤링
-│       │   ├── GachaService.java           # 장비 가챠 (등급별 확률)
-│       │   ├── ShopService.java            # 상점 아이템 구매
-│       │   └── BattleService.java          # D&D 전투 시스템
-│       ├── controller/                     # REST Controller (4개)
-│       └── dto/                            # Request/Response DTO (7개)
+│       ├── config/                          # CORS, Security, 예외 핸들러
+│       ├── entity/                          # GameCharacter, Equipment, Inventory, ShopItem, BattleLog
+│       ├── enums/                           # CharacterClass, EquipmentType/Grade/Effect, BuffType, WeaponCategory
+│       ├── repository/                      # JPA Repository
+│       ├── service/                         # 핵심 비즈니스 로직
+│       │   ├── CharacterService.java        # 캐릭터 CRUD, 스탯 롤링, 일급
+│       │   ├── GachaService.java            # 장비 가챠
+│       │   ├── ShopService.java             # 물약 상점
+│       │   ├── EquipService.java            # 장착/해제/판매
+│       │   ├── BattleService.java           # D&D 전투 엔진
+│       │   ├── HeroService.java             # NPC 용사 시스템
+│       │   └── DailyScheduleService.java    # 매일 0시 스케줄
+│       ├── controller/                      # REST 엔드포인트
+│       ├── dto/                             # 요청/응답 DTO
+│       └── filter/
+│           └── IpOwnershipFilter.java       # IP 기반 소유권 검증
 │
-└── web/                                    # React 프론트엔드
-    ├── package.json
-    ├── vite.config.ts                      # Vite + API 프록시 설정
-    └── src/
-        ├── App.tsx                         # 라우팅 설정
-        ├── main.tsx
-        ├── index.css                       # 모바일 최적화 다크 테마
-        ├── api/
-        │   └── client.ts                   # API 클라이언트 모듈
-        └── pages/
-            ├── CharacterCreatePage.tsx      # 스탯 랜덤 굴리기 + 캐릭터 생성
-            ├── MainPage.tsx                 # 내 캐릭터 정보, 캐릭터 목록, 상점/가챠 버튼
-            ├── CharacterDetailPage.tsx      # 캐릭터 상세 + 전투 도전
-            ├── ShopPage.tsx                 # 상점 (전투 버프 아이템)
-            ├── GachaPage.tsx                # 장비 가챠 뽑기
-            └── BattlePage.tsx              # 전투 진행 + 로그 표시
+├── web/                                     # React 프론트엔드
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   └── src/
+│       ├── api/client.ts                    # API 클라이언트
+│       ├── components/
+│       │   ├── BattleArena.tsx              # 전투 시각화 (HP바, 물약, 로그)
+│       │   └── SpriteAvatar.tsx             # 스프라이트 아바타
+│       ├── data/                            # 아바타, 클래스 데이터
+│       └── pages/
+│           ├── HomePage.tsx                 # ELO 랭킹 + 전투 버튼
+│           ├── CharacterCreatePage.tsx      # 캐릭터 생성
+│           ├── MyPage.tsx                   # 캐릭터 정보 (본인/타인 뷰)
+│           ├── ShopPage.tsx                 # 물약 상점
+│           ├── GachaPage.tsx                # 장비 가챠
+│           └── BattlePage.tsx               # 전투 실행
+│
+└── docker-compose.yml
 ```
 
 ---
@@ -105,122 +69,143 @@ pgallBattle/
 ## 실행 방법
 
 ### 사전 요구사항
+- Java 21
+- Node.js 22+
 
-- Java 25 (Amazon Corretto)
-- Node.js 24+
-- PostgreSQL 17
-
-### 1. 데이터베이스 준비
-
-```bash
-# PostgreSQL에 접속하여 유저 및 DB 생성
-psql -U postgres
-CREATE ROLE pgall WITH LOGIN PASSWORD 'pgall1234!@#$' CREATEDB;
-CREATE DATABASE pgallbattle OWNER pgall;
-```
-
-### 2. API 서버 실행
-
+### API 서버
 ```bash
 cd api
-./gradlew bootRun
+./gradlew bootRun    # http://localhost:8080
 ```
 
-서버가 `http://localhost:8080`에서 실행됩니다.
-최초 실행 시 JPA가 테이블을 자동 생성하고, `data.sql`로 상점 초기 데이터를 삽입합니다.
+최초 실행 시 JPA가 테이블을 자동 생성하고, NPC 용사 캐릭터 5명이 생성된다.
 
-### 3. React 개발서버 실행
-
+### 프론트엔드 개발서버
 ```bash
 cd web
-npm install    # 최초 1회
-npm run dev
+npm install          # 최초 1회
+npm run dev          # http://localhost:5173
 ```
 
-`http://localhost:5173`에서 접속 가능합니다.
-Vite 프록시가 `/api/**` 요청을 `localhost:8080`으로 전달합니다.
+Vite 프록시가 `/api/*` 요청을 `localhost:8080`으로 전달한다.
+
+### Docker 배포
+```bash
+docker-compose up --build    # API: 8080, Web: 80
+```
 
 ---
 
 ## API 엔드포인트
 
-### Character
+### 캐릭터
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| GET | `/api/characters/random-stats` | 랜덤 스탯 생성 (4d6 drop lowest) |
+| GET | `/api/characters/random-stats` | 4d6 drop lowest 스탯 생성 |
 | POST | `/api/characters` | 캐릭터 생성 |
-| GET | `/api/characters` | 전체 캐릭터 목록 |
-| GET | `/api/characters/{id}` | 캐릭터 상세 조회 |
+| GET | `/api/characters/ranking` | ELO 랭킹 조회 |
+| GET | `/api/characters/{id}` | 캐릭터 상세 |
+| GET | `/api/characters/mine` | 내 캐릭터 조회 (IP 기반) |
+| DELETE | `/api/characters/{id}` | 캐릭터 삭제 |
+| POST | `/api/characters/{id}/daily-check` | 일급 300G 수령 |
 
-### Gacha
+### 장비
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| POST | `/api/gacha/{characterId}` | 가챠 뽑기 (30G 소모) |
+| POST | `/api/gacha/{characterId}` | 가챠 뽑기 (30G) |
+| PUT | `/api/characters/{charId}/equipment/{equipId}/equip` | 장착 |
+| PUT | `/api/characters/{charId}/equipment/{equipId}/unequip` | 해제 |
+| POST | `/api/characters/{charId}/equipment/{equipId}/sell` | 판매 |
 
-### Shop
+### 상점
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| GET | `/api/shop/items` | 상점 아이템 목록 |
-| POST | `/api/shop/buy` | 아이템 구매 |
+| GET | `/api/shop/{characterId}/items` | 상점 목록 |
+| POST | `/api/shop/{characterId}/refresh` | 상점 새로고침 (골드 소모) |
+| POST | `/api/shop/{characterId}/buy/{index}` | 물약 구매 |
 
-### Battle
+### 전투
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| POST | `/api/battle` | 전투 실행 |
-| GET | `/api/battle/logs/{characterId}` | 전투 기록 조회 |
+| POST | `/api/battle` | PvP 전투 실행 |
+| GET | `/api/battle/logs/{characterId}` | 전투 기록 |
 
 ---
 
 ## 게임 시스템
 
-### 캐릭터 생성
-- D&D 방식 **4d6 drop lowest**로 6개 스탯(STR, DEX, CON, INT, WIS, CHA)을 랜덤 생성
-- 마음에 드는 스탯이 나올 때까지 무한 재굴림 가능
-- 초기 골드 100G 지급
-- HP = 10 + CON 보정치
+### 캐릭터
+- **클래스**: 전사(STR), 도적(DEX), 마법사(INT), 성직자(WIS), 궁수(DEX)
+- **스탯**: 4d6 drop lowest로 STR, DEX, CON, INT, WIS, CHA 생성
+- **HP**: 클래스별 Hit Die + CON 보정치
+- **초기 골드**: 100G / **일급**: 매일 300G
+- **ELO**: 1000에서 시작, 전투 결과에 따라 변동
+- **소유권**: IP당 캐릭터 1개
 
-### 가챠 (장비 뽑기)
-- **비용**: 30G
-- **장비 종류**: 무기, 투구, 갑옷, 신발, 귀걸이, 반지
-- **등급별 확률**:
+### 장비 가챠
 
-| 등급 | 확률 | 특수효과 |
-|------|------|----------|
-| Common | 49% | 없음 |
-| Uncommon | 30% | 없음 |
-| Rare | 15% | 60% 확률로 부여 |
-| Epic | 5% | 60% 확률로 부여 |
-| Legendary | 1% | 60% 확률로 부여 |
+**비용**: 30G / **장비 종류**: 무기, 투구, 갑옷, 장갑, 신발, 귀걸이, 반지
 
-### 장비 특수효과
+| 등급 | 확률 | 특수효과 확률 | 판매가 |
+|------|------|--------------|--------|
+| Common | 49% | - | 5G |
+| Uncommon | 30% | - | 10G |
+| Rare | 15% | 60% | 20G |
+| Epic | 5% | 60% | 80G |
+| Legendary | 1% | 60% | 200G |
 
-| 효과 | 설명 | 부여 가능 장비 |
-|------|------|----------------|
-| DOUBLE_ATTACK | 공격을 두 번 수행 | 무기 |
-| LIFE_STEAL | 데미지의 일부를 HP로 흡수 | 무기 |
-| STUN | 상대를 기절시켜 턴 스킵 | 투구 |
-| BLOCK_CHANCE | 상대 공격을 차단 | 갑옷 |
-| DEBUFF_DEF_DOWN | 상대 방어력 감소 | 신발 |
-| DEBUFF_ATK_DOWN | 상대 공격력 감소 | 귀걸이 |
-| POISON | 매 턴 독 데미지 | 반지 |
+**장착 슬롯**: 무기 x2, 투구 x1, 갑옷 x1, 장갑 x1, 신발 x1, 귀걸이 x2, 반지 x2 (총 10슬롯)
 
-### 상점
+**무기 카테고리**: 양손(지팡이, 창, 대검, 활) / 한손(검, 단검, 클로, 메이스, 도끼, 레이피어, 완드, 도리깨)
+- 양손무기는 무기 슬롯 2개를 모두 차지
+- 한손무기는 듀얼 와일드 가능
 
-| 아이템 | 가격 | 효과 |
-|--------|------|------|
-| 크리티컬 부적 | 50G | 크리티컬 범위 19~20으로 확장 |
-| 질풍의 두루마리 | 80G | 공격을 두 번 수행 |
-| 수호의 방패 | 40G | 공격을 한 번 완전히 차단 |
-| 치유 물약 | 30G | 전투 시작 전 HP 회복 |
+### 특수효과 (60종)
 
-### 전투 시스템 (D&D 간소화)
+**무기 효과** (20종): 화염/빙결/번개/신성/암흑/산성 공격, 관통, 출혈, 흡혈, 더블 어택, 크리티컬 강화, 기절 타격, 넉백, 참수, 공격력 감소, 방어력 감소, 속도 감소, 침묵, 무장 해제, 처형
 
-1. **이니셔티브**: 양측 d20 + DEX 보정치로 선공 결정
-2. **공격 판정**: d20 + STR 보정치 >= 상대 AC(10 + DEX 보정치 + 장비 방어력)
-3. **데미지**: 무기 기본 데미지 + STR 보정치
-4. **크리티컬**: d20이 20이면 데미지 2배 (크리티컬 부적 사용 시 19~20)
-5. **버프/특수효과**: 전투 시작 시 보유 아이템 및 장비 효과 발동 판정
-6. **승리 조건**: 상대 HP를 0 이하로 만들거나, 20라운드 후 HP가 더 많은 쪽 판정승
-7. **보상**: 승리 시 10~29G 랜덤 획득
+**방어구 효과** (20종): 공격 차단, 마법 저항, 가시, HP 재생, 피해 감소, 회피 증가, 5종 원소 저항, 기절 저항, 마법 반사, 재기, 중갑, 인내, 불굴, 철피, 치유 오라, 흡수 보호막, 강화
+
+**악세사리 효과** (20종): 명중률 증가, 반격, 독, 허약 저주, 마나 보호막, 가속, 행운, 흡혈 오라, 죽음의 보호, 위협, 축복, 완전 회피, 꿰뚫는 시선, 영혼 수확, 비전 집중, 신의 은총, 혼돈 일격, 원소 강화, 영혼 연결, 마나 흡수
+
+### 물약 상점
+
+- 랜덤 4~6종 진열, 새로고침 가능 (비용 점점 증가)
+- **치유**: 치유 물약 / 대형 치유 물약
+- **공격**: 크리티컬 더블, 더블 어택, 화염/빙결/번개/신성 부여, 관통 강화
+- **방어**: 보호 물약, 재생 물약, 철피 물약
+- **유틸**: 반사 물약, 명중 물약, 가속 물약, 축복 물약
+- 최대 5개 보유 가능
+
+### 전투 (D&D 5e 기반)
+
+1. **이니셔티브**: d20 + DEX 보정치 → 선공 결정
+2. **공격 판정**: d20 + 능력치 보정 ≥ 상대 AC
+3. **AC**: 10 + DEX 보정치 + 장비 방어력 + 클래스 보너스
+4. **데미지**: 무기 기본 데미지 + 스케일링 스탯 보정치
+5. **크리티컬**: d20=20 → 데미지 2배 (크리티컬 물약 시 19~20)
+6. **장비 효과**: 공격/피격 시 확률적으로 발동
+7. **물약**: 전투 시작 시 자동 적용, 힐 물약은 HP 낮을 때 자동 사용
+8. **승리 조건**: 상대 HP 0 이하 또는 20라운드 후 HP 비교
+9. **보상**: 승리 시 10~29G + ELO 변동
+
+### NPC 용사 시스템
+
+- 서버 시작 시 클래스별 1명씩 5명의 용사 자동 생성
+- 초기 50회 가챠 → 최적 장비 자동 장착
+- 매일 0시 5회 가챠 추가 → 장비 갱신
+- 랭킹에 참여하여 다른 플레이어가 도전 가능
 
 ---
+
+## 프론트엔드 라우트
+
+| 경로 | 페이지 |
+|------|--------|
+| `/` | 홈 (ELO 랭킹) |
+| `/create` | 캐릭터 생성 |
+| `/mypage/:id` | 내 캐릭터 (장비 관리, 인벤토리) |
+| `/character/:id` | 다른 캐릭터 정보 보기 |
+| `/shop/:id` | 물약 상점 |
+| `/gacha/:id` | 장비 가챠 |
+| `/battle/:attackerId/:defenderId` | 전투 |
