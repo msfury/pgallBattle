@@ -199,7 +199,10 @@ public class HeroService {
                 String[] options = {"ranger_1", "ranger_2"};
                 yield options[random.nextInt(options.length)];
             }
-            case ROGUE -> "rogue_1";
+            case ROGUE -> {
+                String[] options = {"rogue_1", "rogue_2"};
+                yield options[random.nextInt(options.length)];
+            }
             case CLERIC -> "cleric_1";
         };
     }
