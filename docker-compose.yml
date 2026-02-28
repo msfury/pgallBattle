@@ -1,6 +1,8 @@
 services:
   api:
-    build: ./api
+    build:
+      context: .
+      dockerfile: api/Dockerfile
     environment:
       - SQLITE_PATH=/data/pgallbattle.db
     volumes:
