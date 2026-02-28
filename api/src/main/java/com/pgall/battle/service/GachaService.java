@@ -58,6 +58,23 @@ public class GachaService {
         return EquipmentResponse.from(equipment);
     }
 
+    /** 골드 차감 없이 랜덤 가챠 (용사 시스템용) */
+    @Transactional
+    public Equipment pullFree(GameCharacter character) {
+        EquipmentGrade grade = rollGrade();
+        EquipmentType type = rollType();
+        Equipment equipment = generateEquipment(grade, type, character);
+        return equipmentRepository.save(equipment);
+    }
+
+    /** 골드 차감 없이 특정 타입 가챠 (용사 시스템용) */
+    @Transactional
+    public Equipment pullFreeForType(GameCharacter character, EquipmentType type) {
+        EquipmentGrade grade = rollGrade();
+        Equipment equipment = generateEquipment(grade, type, character);
+        return equipmentRepository.save(equipment);
+    }
+
     private EquipmentGrade rollGrade() {
         int roll = ThreadLocalRandom.current().nextInt(100);
         if (roll < 1) return EquipmentGrade.LEGENDARY;

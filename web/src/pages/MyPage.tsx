@@ -1,8 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, type Character, type Equipment } from '../api/client';
 import { CLASS_EMOJI, CLASS_COLOR } from '../data/classes';
 import SpriteAvatar from '../components/SpriteAvatar';
+
+const SELL_PRICE: Record<string, number> = {
+  COMMON: 5, UNCOMMON: 10, RARE: 20, EPIC: 80, LEGENDARY: 200,
+};
 
 const GRADE_CLASS: Record<string, string> = {
   COMMON: 'grade-common', UNCOMMON: 'grade-uncommon', RARE: 'grade-rare',
@@ -56,12 +60,25 @@ export default function MyPage() {
 
   const [char, setChar] = useState<Character | null>(null);
   const [error, setError] = useState('');
+  const [toast, setToast] = useState('');
 
-  const loadChar = () => api.getCharacter(myId).then(setChar).catch(e => {
+  const loadChar = useCallback(() => api.getCharacter(myId).then(setChar).catch(e => {
     setError(e instanceof Error ? e.message : '로딩 실패');
-  });
+  }), [myId]);
 
-  useEffect(() => { loadChar(); }, [myId]);
+  useEffect(() => { loadChar(); }, [loadChar]);
+
+  // 일급 토스트: 매일 첫 접속 시 알림
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const key = `dailyGold_${myId}`;
+    if (localStorage.getItem(key) !== today) {
+      localStorage.setItem(key, today);
+      setToast('오늘 일급이 발급되었어요! +300G');
+      const timer = setTimeout(() => setToast(''), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [myId]);
 
   const handleEquip = async (equipId: number) => {
     try {
@@ -80,6 +97,18 @@ export default function MyPage() {
       await loadChar();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '해제 실패');
+    }
+  };
+
+  const handleSell = async (eq: Equipment) => {
+    const price = SELL_PRICE[eq.grade] || 5;
+    if (!confirm(`"${eq.name}"을(를) ${price}G에 판매하시겠습니까?`)) return;
+    try {
+      setError('');
+      await api.sellEquipment(myId, eq.id);
+      await loadChar();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '판매 실패');
     }
   };
 
@@ -104,6 +133,19 @@ export default function MyPage() {
 
   return (
     <div>
+      {/* 일급 토스트 */}
+      {toast && (
+        <div style={{
+          position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+          background: 'linear-gradient(135deg, #f39c12, #e67e22)', color: '#fff',
+          padding: '12px 24px', borderRadius: 12, fontWeight: 'bold', fontSize: '0.95rem',
+          zIndex: 9999, boxShadow: '0 4px 20px rgba(243,156,18,0.4)',
+          animation: 'toast-slide 0.3s ease-out',
+        }}>
+          {toast}
+        </div>
+      )}
+
       <button className="back-btn" onClick={() => navigate('/')}>← 홈</button>
 
       {/* 캐릭터 정보 */}
@@ -211,7 +253,15 @@ export default function MyPage() {
                 )}
               </div>
             </div>
-            <button className="btn-sm btn-green" onClick={() => handleEquip(eq.id)}>장착</button>
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              <button className="btn-sm btn-green" onClick={() => handleEquip(eq.id)}>장착</button>
+              <button className="btn-sm" style={{
+                background: '#e67e22', color: '#fff', border: 'none', cursor: 'pointer',
+                padding: '4px 8px', borderRadius: 4, fontSize: '0.7rem',
+              }} onClick={() => handleSell(eq)}>
+                판매 {SELL_PRICE[eq.grade] || 5}G
+              </button>
+            </div>
           </div>
         ))}
       </div>

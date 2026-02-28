@@ -8,35 +8,38 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [error, setError] = useState('');
-  const [myId, setMyId] = useState(Number(localStorage.getItem('myCharId') || 0));
+  const [myId, setMyId] = useState(0);
 
   useEffect(() => {
     api.getRanking()
       .then(setCharacters)
       .catch(e => setError(e instanceof Error ? e.message : '로딩 실패'));
 
-    // 저장된 캐릭터가 실제로 존재하는지 확인
-    if (myId > 0) {
-      api.getCharacter(myId).catch(() => {
-        localStorage.removeItem('myCharId');
+    // IP 기반으로 내 캐릭터 조회
+    api.getMyCharacter()
+      .then(c => {
+        setMyId(c.id);
+        localStorage.setItem('myCharId', String(c.id));
+      })
+      .catch(() => {
         setMyId(0);
+        localStorage.removeItem('myCharId');
       });
-    }
   }, []);
 
   return (
     <div>
-      <h1>⚔️ pgallBattle</h1>
+      <h1>pgallBattle</h1>
 
       <div className="flex-row mb-16">
         {myId > 0 ? (
-          <button className="btn-blue" onClick={() => navigate(`/mypage/${myId}`)}>👤 내 캐릭터</button>
+          <button className="btn-blue" onClick={() => navigate(`/mypage/${myId}`)}>내 캐릭터</button>
         ) : (
-          <button className="btn-green" onClick={() => navigate('/create')}>✨ 캐릭터 생성</button>
+          <button className="btn-green" onClick={() => navigate('/create')}>캐릭터 생성</button>
         )}
       </div>
 
-      <h2>🏆 ELO 랭킹</h2>
+      <h2>ELO 랭킹</h2>
       {characters.length === 0 && !error && (
         <p style={{ color: '#999', textAlign: 'center', padding: 16 }}>아직 모험자가 없습니다</p>
       )}

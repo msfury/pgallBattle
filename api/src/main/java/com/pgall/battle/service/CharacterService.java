@@ -36,7 +36,12 @@ public class CharacterService {
     }
 
     @Transactional
-    public CharacterResponse createCharacter(CharacterCreateRequest request) {
+    public CharacterResponse createCharacter(CharacterCreateRequest request, String ip) {
+        // 이미 해당 IP로 생성된 캐릭터가 있으면 차단
+        characterRepository.findByIpAddress(ip).ifPresent(c -> {
+            throw new IllegalStateException("이미 캐릭터가 존재합니다: " + c.getName());
+        });
+
         CharacterClass charClass = null;
         if (request.getCharacterClass() != null && !request.getCharacterClass().isBlank()) {
             charClass = CharacterClass.valueOf(request.getCharacterClass());
@@ -46,6 +51,7 @@ public class CharacterService {
                 .name(request.getName())
                 .avatar(request.getAvatar())
                 .characterClass(charClass)
+                .ipAddress(ip)
                 .strength(request.getStrength())
                 .dexterity(request.getDexterity())
                 .constitution(request.getConstitution())
@@ -55,6 +61,13 @@ public class CharacterService {
                 .build();
 
         character = characterRepository.save(character);
+        return CharacterResponse.from(character);
+    }
+
+    /** 해당 IP로 생성된 내 캐릭터 조회 */
+    public CharacterResponse getMyCharacter(String ip) {
+        GameCharacter character = characterRepository.findByIpAddress(ip)
+                .orElseThrow(() -> new NoSuchElementException("캐릭터가 없습니다."));
         return CharacterResponse.from(character);
     }
 
