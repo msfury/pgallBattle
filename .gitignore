@@ -20,3 +20,7 @@ Thumbs.db
 .env
 *.local
 /.claude/
+
+# SQLite WAL/SHM (runtime files)
+*.db-shm
+*.db-wal
