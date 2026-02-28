@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:sqlite:D:/data/pgallBattle/pgallbattle.db?busy_timeout=5000&journal_mode=WAL
+    url: jdbc:sqlite:${SQLITE_PATH:D:/data/pgallBattle/pgallbattle.db}?busy_timeout=5000&journal_mode=WAL
     driver-class-name: org.sqlite.JDBC
     hikari:
       maximum-pool-size: 1

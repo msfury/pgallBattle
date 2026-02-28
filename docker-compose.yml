@@ -1,0 +1,21 @@
+services:
+  api:
+    build: ./api
+    environment:
+      - SQLITE_PATH=/data/pgallbattle.db
+    volumes:
+      - pgall-data:/data
+      - pgall-logs:/app/logs
+    ports:
+      - "8080:8080"
+
+  web:
+    build: ./web
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+
+volumes:
+  pgall-data:
+  pgall-logs:
