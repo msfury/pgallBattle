@@ -1,14 +1,10 @@
 package com.pgall.battle.controller;
 
-import com.pgall.battle.dto.ShopBuyRequest;
-import com.pgall.battle.entity.Inventory;
-import com.pgall.battle.entity.ShopItem;
+import com.pgall.battle.dto.ShopResponse;
 import com.pgall.battle.service.ShopService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/shop")
@@ -17,13 +13,18 @@ public class ShopController {
 
     private final ShopService shopService;
 
-    @GetMapping("/items")
-    public ResponseEntity<List<ShopItem>> list() {
-        return ResponseEntity.ok(shopService.getAllItems());
+    @GetMapping("/{characterId}/items")
+    public ResponseEntity<ShopResponse> getShop(@PathVariable Long characterId) {
+        return ResponseEntity.ok(shopService.getShop(characterId));
     }
 
-    @PostMapping("/buy")
-    public ResponseEntity<Inventory> buy(@RequestBody ShopBuyRequest request) {
-        return ResponseEntity.ok(shopService.buyItem(request));
+    @PostMapping("/{characterId}/refresh")
+    public ResponseEntity<ShopResponse> refresh(@PathVariable Long characterId) {
+        return ResponseEntity.ok(shopService.refresh(characterId));
+    }
+
+    @PostMapping("/{characterId}/buy/{index}")
+    public ResponseEntity<ShopResponse> buy(@PathVariable Long characterId, @PathVariable int index) {
+        return ResponseEntity.ok(shopService.buyItem(characterId, index));
     }
 }

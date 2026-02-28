@@ -11,6 +11,7 @@ export default function BattlePage() {
   const [displayedLogs, setDisplayedLogs] = useState<string[]>([]);
   const [currentLogIndex, setCurrentLogIndex] = useState(-1);
   const [battling, setBattling] = useState(true);
+  const [battleFinished, setBattleFinished] = useState(false);
   const [error, setError] = useState('');
   const logEndRef = useRef<HTMLDivElement>(null);
 
@@ -20,15 +21,30 @@ export default function BattlePage() {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [displayedLogs]);
 
+  const getLogDelay = (log: string): number => {
+    // Attack/damage logs get longer delay for animation sync
+    if (log.includes('명중') || log.includes('크리티컬') || log.includes('데미지를 입') ||
+        log.includes('빗나감') || log.includes('차단')) {
+      return 800;
+    }
+    // Round markers
+    if (log.includes('===')) return 600;
+    // Victory/defeat
+    if (log.includes('승리') || log.includes('패배')) return 1000;
+    // Everything else (buffs, potions, status effects)
+    return 400;
+  };
+
   const startBattle = async () => {
     try {
       const res = await api.battle(Number(attackerId), Number(defenderId));
       setResult(res);
       for (let i = 0; i < res.battleLog.length; i++) {
-        await delay(400);
+        await delay(getLogDelay(res.battleLog[i]));
         setDisplayedLogs((prev) => [...prev, res.battleLog[i]]);
         setCurrentLogIndex(i);
       }
+      setBattleFinished(true);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '전투 실패');
     } finally {
@@ -57,6 +73,10 @@ export default function BattlePage() {
           defenderMaxHp={result.defenderMaxHp}
           currentLog={currentLog}
           logIndex={currentLogIndex}
+          battleFinished={battleFinished}
+          winnerId={result.winnerId}
+          attackerId={Number(attackerId)}
+          defenderId={Number(defenderId)}
         />
       )}
 
@@ -72,12 +92,14 @@ export default function BattlePage() {
                    log.includes('빗나감') || log.includes('회피') ? '#666' :
                    log.includes('===') ? '#6c5ce7' :
                    log.includes('---') ? '#555' :
-                   log.includes('발동') ? '#f39c12' :
-                   log.includes('기절') ? '#9b59b6' :
-                   log.includes('차단') ? '#3498db' :
-                   log.includes('독') ? '#2ecc71' :
+                   log.includes('발동') || log.includes('효과') ? '#f39c12' :
+                   log.includes('기절') || log.includes('침묵') || log.includes('무장 해제') ? '#9b59b6' :
+                   log.includes('차단') || log.includes('보호막') ? '#3498db' :
+                   log.includes('독') || log.includes('출혈') ? '#27ae60' :
                    log.includes('흡수') || log.includes('흡혈') ? '#e74c3c' :
-                   log.includes('회복') ? '#2ecc71' :
+                   log.includes('회복') || log.includes('재생') ? '#2ecc71' :
+                   log.includes('화염') || log.includes('빙결') || log.includes('번개') ? '#e67e22' :
+                   log.includes('물약') ? '#1abc9c' :
                    '#ccc',
             fontWeight: log.includes('===') || log.includes('승리') ? 'bold' : 'normal',
             padding: '1px 0',

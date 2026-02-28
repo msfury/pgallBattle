@@ -10,8 +10,27 @@ const GRADE_CLASS: Record<string, string> = {
 };
 
 const EFFECT_NAMES: Record<string, string> = {
-  DOUBLE_ATTACK: '더블 어택', DEBUFF_ATK_DOWN: '공격력 감소', DEBUFF_DEF_DOWN: '방어력 감소',
-  BLOCK_CHANCE: '공격 차단', POISON: '독', STUN: '기절', LIFE_STEAL: '흡혈', ACCURACY_UP: '명중률 증가',
+  // 무기 효과
+  FIRE_DAMAGE: '화염 공격', ICE_DAMAGE: '빙결 공격', LIGHTNING_DAMAGE: '번개 공격',
+  HOLY_DAMAGE: '신성 공격', DARK_DAMAGE: '암흑 공격', ACID_DAMAGE: '산성 공격',
+  ARMOR_PENETRATION: '관통', BLEEDING: '출혈', LIFE_STEAL: '흡혈', DOUBLE_ATTACK: '더블 어택',
+  CRITICAL_BOOST: '크리티컬 강화', STUN_STRIKE: '기절 타격', KNOCKBACK: '넉백', VORPAL: '참수',
+  DEBUFF_ATK_DOWN: '공격력 감소', DEBUFF_DEF_DOWN: '방어력 감소', SLOW: '속도 감소',
+  SILENCE: '침묵', DISARM: '무장 해제', EXECUTE: '처형',
+  // 방어구 효과
+  BLOCK_CHANCE: '공격 차단', MAGIC_RESISTANCE: '마법 저항', THORNS: '가시', HP_REGEN: 'HP 재생',
+  DAMAGE_REDUCTION: '피해 감소', DODGE_BOOST: '회피 증가', FIRE_RESISTANCE: '화염 저항',
+  ICE_RESISTANCE: '빙결 저항', LIGHTNING_RESISTANCE: '번개 저항', POISON_RESISTANCE: '독 저항',
+  STUN_RESISTANCE: '기절 저항', REFLECT_MAGIC: '마법 반사', SECOND_WIND: '재기',
+  HEAVY_ARMOR: '중갑', ENDURANCE: '인내', PERSEVERANCE: '불굴', IRON_SKIN: '철피',
+  HEALING_AURA: '치유 오라', ABSORB_SHIELD: '흡수 보호막', FORTIFY: '강화',
+  // 악세사리 효과
+  ACCURACY_UP: '명중률 증가', COUNTER_ATTACK: '반격', POISON: '독', CURSE_WEAKNESS: '허약 저주',
+  MANA_SHIELD: '마나 보호막', HASTE: '가속', LUCK: '행운', VAMPIRIC_AURA: '흡혈 오라',
+  DEATH_WARD: '죽음의 보호', INTIMIDATE: '위협', BLESS: '축복', EVASION: '완전 회피',
+  PIERCING_GAZE: '꿰뚫는 시선', SOUL_HARVEST: '영혼 수확', ARCANE_FOCUS: '비전 집중',
+  DIVINE_FAVOR: '신의 은총', CHAOS_STRIKE: '혼돈 일격', ELEMENTAL_BOOST: '원소 강화',
+  SPIRIT_LINK: '영혼 연결', MANA_DRAIN: '마나 흡수',
 };
 
 const TYPE_EMOJI: Record<string, string> = {
