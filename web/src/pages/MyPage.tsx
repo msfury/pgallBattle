@@ -217,6 +217,22 @@ export default function MyPage() {
       </div>
 
       {error && <p className="error mb-12">{error}</p>}
+
+      {/* 캐릭터 삭제 */}
+      <div className="card mb-12" style={{ borderColor: 'rgba(231,76,60,0.3)' }}>
+        <button className="btn-full btn-red" onClick={async () => {
+          if (!confirm(`정말 "${char.name}" 캐릭터를 삭제하시겠습니까?\n모든 장비, 아이템, 전투 기록이 삭제됩니다.`)) return;
+          try {
+            await api.deleteCharacter(myId);
+            localStorage.removeItem('myCharId');
+            navigate('/create');
+          } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : '삭제 실패');
+          }
+        }}>
+          캐릭터 삭제
+        </button>
+      </div>
     </div>
   );
 }

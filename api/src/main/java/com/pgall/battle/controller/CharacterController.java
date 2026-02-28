@@ -45,6 +45,12 @@ public class CharacterController {
         return ResponseEntity.ok(characterService.getCharacter(id));
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        characterService.deleteCharacter(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/{charId}/equipment/{equipId}/equip")
     public ResponseEntity<EquipmentResponse> equip(@PathVariable Long charId, @PathVariable Long equipId) {
         return ResponseEntity.ok(equipService.equip(charId, equipId));

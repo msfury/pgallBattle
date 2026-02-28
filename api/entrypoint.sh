@@ -4,4 +4,4 @@ if [ ! -f "$SQLITE_PATH" ]; then
   echo "DB not found at $SQLITE_PATH, copying default..."
   cp /app/pgallbattle.db.default "$SQLITE_PATH"
 fi
-exec java -jar /app/app.jar
+exec java --enable-native-access=ALL-UNNAMED -jar /app/app.jar

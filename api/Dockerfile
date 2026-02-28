@@ -1,4 +1,4 @@
-FROM amazoncorretto:25 AS build
+FROM amazoncorretto:21 AS build
 WORKDIR /app
 COPY api/gradle/ gradle/
 COPY api/gradlew api/build.gradle api/settings.gradle ./
@@ -6,7 +6,7 @@ RUN chmod +x gradlew && ./gradlew dependencies --no-daemon
 COPY api/src/ src/
 RUN ./gradlew bootJar --no-daemon
 
-FROM amazoncorretto:25-alpine
+FROM amazoncorretto:21-alpine
 WORKDIR /app
 COPY --from=build /app/build/libs/*.jar app.jar
 COPY api/entrypoint.sh /app/entrypoint.sh
