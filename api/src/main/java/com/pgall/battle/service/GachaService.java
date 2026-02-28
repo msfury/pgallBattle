@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -22,6 +24,18 @@ public class GachaService {
 
     private final GameCharacterRepository characterRepository;
     private final EquipmentRepository equipmentRepository;
+
+    // 슬롯별 효과 풀
+    private static final List<EquipmentEffect> WEAPON_EFFECTS =
+            Arrays.stream(EquipmentEffect.values())
+                    .filter(e -> e.getCategory() == EquipmentEffect.Category.WEAPON).toList();
+
+    private static final List<EquipmentEffect> ARMOR_EFFECTS =
+            Arrays.stream(EquipmentEffect.values())
+                    .filter(e -> e.getCategory() == EquipmentEffect.Category.ARMOR).toList();
+
+    private static final List<EquipmentEffect> ACCESSORY_EFFECTS =
+            List.of(EquipmentEffect.values()); // 악세사리는 모든 효과 가능
 
     @Transactional
     public EquipmentResponse pull(Long characterId) {
@@ -126,31 +140,61 @@ public class GachaService {
                .attackBonus(atkBonus)
                .defenseBonus(defBonus);
 
-        // RARE 이상 특수효과 부여 (60% 확률)
-        if (grade.ordinal() >= EquipmentGrade.RARE.ordinal()) {
-            EquipmentEffect effect = rollEffect(type);
-            if (effect != null) {
-                builder.effect(effect)
-                        .effectChance(10 + gradeMultiplier * 5)
-                        .effectValue(gradeMultiplier);
-            }
+        // 효과 부여 - 등급별 확률
+        EquipmentEffect effect = rollEffect(type, grade);
+        if (effect != null) {
+            builder.effect(effect)
+                    .effectChance(getEffectChance(grade))
+                    .effectValue(getEffectValue(grade));
         }
 
         return builder.build();
     }
 
-    private EquipmentEffect rollEffect(EquipmentType type) {
+    private EquipmentEffect rollEffect(EquipmentType type, EquipmentGrade grade) {
         ThreadLocalRandom random = ThreadLocalRandom.current();
-        if (random.nextInt(100) >= 60) return null;
 
+        // 등급별 효과 획득 확률
+        int chance = switch (grade) {
+            case COMMON, UNCOMMON -> 40;
+            case RARE -> 60;
+            case EPIC -> 80;
+            case LEGENDARY -> 100;
+        };
+        if (random.nextInt(100) >= chance) return null;
+
+        // 슬롯별 효과 풀에서 랜덤 선택
+        List<EquipmentEffect> pool = getEffectPool(type);
+        return pool.get(random.nextInt(pool.size()));
+    }
+
+    private List<EquipmentEffect> getEffectPool(EquipmentType type) {
         return switch (type) {
-            case WEAPON -> random.nextBoolean() ? EquipmentEffect.DOUBLE_ATTACK : EquipmentEffect.LIFE_STEAL;
-            case HELMET -> EquipmentEffect.STUN;
-            case ARMOR -> EquipmentEffect.BLOCK_CHANCE;
-            case GLOVES -> EquipmentEffect.ACCURACY_UP;
-            case SHOES -> EquipmentEffect.DEBUFF_DEF_DOWN;
-            case EARRING -> EquipmentEffect.DEBUFF_ATK_DOWN;
-            case RING -> EquipmentEffect.POISON;
+            case WEAPON -> WEAPON_EFFECTS;
+            case HELMET, ARMOR, GLOVES, SHOES -> ARMOR_EFFECTS;
+            case EARRING, RING -> ACCESSORY_EFFECTS;
+        };
+    }
+
+    /** 등급별 효과 발동 확률 (%) */
+    private int getEffectChance(EquipmentGrade grade) {
+        return switch (grade) {
+            case COMMON -> 5;
+            case UNCOMMON -> 10;
+            case RARE -> 15;
+            case EPIC -> 20;
+            case LEGENDARY -> 30;
+        };
+    }
+
+    /** 등급별 효과 수치 */
+    private int getEffectValue(EquipmentGrade grade) {
+        return switch (grade) {
+            case COMMON -> 1;
+            case UNCOMMON -> 2;
+            case RARE -> 3;
+            case EPIC -> 4;
+            case LEGENDARY -> 6;
         };
     }
 

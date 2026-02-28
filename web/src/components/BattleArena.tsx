@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { CLASS_COLOR } from '../data/classes';
 import SpriteAvatar from './SpriteAvatar';
 
+type AnimationType = 'idle' | 'walk' | 'attack' | 'hit' | 'death';
+
 interface BattleArenaProps {
   attackerAvatar: string | null;
   defenderAvatar: string | null;
@@ -13,37 +15,52 @@ interface BattleArenaProps {
   defenderMaxHp: number;
   currentLog: string | null;
   logIndex: number;
-}
-
-type AnimationType = 'idle' | 'walk' | 'attack' | 'hit' | 'death';
-
-function detectAnimation(log: string, name: string): { anim: AnimationType; targetAnim: AnimationType } {
-  const isAttacker = log.includes(`${name}의`) || log.startsWith(`[${name}]`) || log.includes(`${name} ->`);
-
-  if (log.includes('크리티컬') || log.includes('명중') || log.includes('데미지') || log.includes('공격')) {
-    return isAttacker ? { anim: 'attack', targetAnim: 'hit' } : { anim: 'hit', targetAnim: 'attack' };
-  }
-  if (log.includes('빗나감') || log.includes('회피') || log.includes('차단')) {
-    return { anim: 'attack', targetAnim: 'idle' };
-  }
-  if (log.includes('쓰러') || log.includes('패배')) {
-    return { anim: 'idle', targetAnim: 'death' };
-  }
-  return { anim: 'idle', targetAnim: 'idle' };
+  battleFinished: boolean;
+  winnerId: number | null;
+  attackerId: number;
+  defenderId: number;
 }
 
 export default function BattleArena({
   attackerAvatar, defenderAvatar, attackerClass, defenderClass,
   attackerName, defenderName, attackerMaxHp, defenderMaxHp,
-  currentLog, logIndex,
+  currentLog, logIndex, battleFinished, winnerId, attackerId, defenderId,
 }: BattleArenaProps) {
   const [attackerHp, setAttackerHp] = useState(attackerMaxHp);
   const [defenderHp, setDefenderHp] = useState(defenderMaxHp);
   const [leftAnim, setLeftAnim] = useState<AnimationType>('idle');
   const [rightAnim, setRightAnim] = useState<AnimationType>('idle');
+  const [leftPaused, setLeftPaused] = useState(false);
+  const [rightPaused, setRightPaused] = useState(false);
+  const [leftFrozenFrame, setLeftFrozenFrame] = useState<number | undefined>(undefined);
+  const [rightFrozenFrame, setRightFrozenFrame] = useState<number | undefined>(undefined);
 
+  // Battle finished: freeze sprites
   useEffect(() => {
-    if (!currentLog) return;
+    if (!battleFinished || winnerId === null) return;
+
+    const attackerWon = winnerId === attackerId;
+
+    if (attackerWon) {
+      setLeftAnim('idle');
+      setLeftPaused(true);
+      setLeftFrozenFrame(0);
+      setRightAnim('death');
+      setRightPaused(true);
+      setRightFrozenFrame(2); // last frame of death
+    } else {
+      setRightAnim('idle');
+      setRightPaused(true);
+      setRightFrozenFrame(0);
+      setLeftAnim('death');
+      setLeftPaused(true);
+      setLeftFrozenFrame(2); // last frame of death
+    }
+  }, [battleFinished, winnerId, attackerId, defenderId]);
+
+  // Handle log-based animations (only when battle is ongoing)
+  useEffect(() => {
+    if (!currentLog || battleFinished) return;
 
     // Parse HP from log
     const hpMatch = currentLog.match(/남은\s*HP[:\s]*(-?\d+)/);
@@ -58,37 +75,60 @@ export default function BattleArena({
       if (currentLog.includes(defenderName)) setDefenderHp(0);
     }
 
-    // Determine who is acting
+    // Determine who is acting in this log line
     const attackerActing = currentLog.includes(`${attackerName}`) &&
       (currentLog.includes(`${attackerName} ->`) || currentLog.includes(`${attackerName}의`));
+    const defenderActing = currentLog.includes(`${defenderName}`) &&
+      (currentLog.includes(`${defenderName} ->`) || currentLog.includes(`${defenderName}의`));
 
-    if (currentLog.includes('명중') || currentLog.includes('크리티컬') || currentLog.includes('데미지')) {
+    // Reset paused state for active animations
+    setLeftPaused(true);
+    setRightPaused(true);
+    setLeftFrozenFrame(0);
+    setRightFrozenFrame(0);
+
+    const isAttackLog = currentLog.includes('명중') || currentLog.includes('크리티컬') ||
+      currentLog.includes('데미지를 입') || currentLog.includes('공격');
+    const isMissLog = currentLog.includes('빗나감') || currentLog.includes('차단') || currentLog.includes('회피');
+
+    if (isAttackLog) {
       if (attackerActing) {
         setLeftAnim('attack');
+        setLeftPaused(false);
         setRightAnim('hit');
-      } else {
+        setRightPaused(false);
+      } else if (defenderActing) {
         setRightAnim('attack');
+        setRightPaused(false);
         setLeftAnim('hit');
+        setLeftPaused(false);
       }
-    } else if (currentLog.includes('빗나감') || currentLog.includes('차단')) {
-      if (attackerActing) setLeftAnim('attack');
-      else setRightAnim('attack');
-    } else if (currentLog.includes('승리')) {
-      // winner stays idle, loser death
-      if (currentLog.includes(attackerName)) setDefenderAnim('death');
-      else setAttackerAnim('death');
+    } else if (isMissLog) {
+      if (attackerActing) {
+        setLeftAnim('attack');
+        setLeftPaused(false);
+      } else if (defenderActing) {
+        setRightAnim('attack');
+        setRightPaused(false);
+      }
+    } else {
+      // Non-combat log (buffs, potions, round markers): both paused at idle
+      setLeftAnim('idle');
+      setRightAnim('idle');
     }
 
     const timer = setTimeout(() => {
-      setLeftAnim('idle');
-      setRightAnim('idle');
+      if (!battleFinished) {
+        setLeftAnim('idle');
+        setRightAnim('idle');
+        setLeftPaused(true);
+        setRightPaused(true);
+        setLeftFrozenFrame(0);
+        setRightFrozenFrame(0);
+      }
     }, 500);
     return () => clearTimeout(timer);
   }, [currentLog, logIndex]);
-
-  // Helper to safely set anims
-  function setAttackerAnim(a: AnimationType) { setLeftAnim(a); }
-  function setDefenderAnim(a: AnimationType) { setRightAnim(a); }
 
   const renderFighter = (
     avatar: string | null,
@@ -98,13 +138,16 @@ export default function BattleArena({
     maxHp: number,
     anim: AnimationType,
     flip: boolean,
+    paused: boolean,
+    frozenFrame?: number,
   ) => {
     const hpPct = Math.max(0, Math.min(100, (hp / maxHp) * 100));
     const hpColor = hpPct > 50 ? '#2ecc71' : hpPct > 25 ? '#f39c12' : '#e74c3c';
 
     return (
       <div className="arena-fighter">
-        <SpriteAvatar avatarId={avatar} animation={anim} scale={0.8} flip={flip} />
+        <SpriteAvatar avatarId={avatar} animation={anim} scale={0.8} flip={flip}
+          paused={paused} frozenFrame={frozenFrame} />
         <div className="arena-name">{name}</div>
         {charClass && (
           <div className="arena-class-badge"
@@ -122,9 +165,11 @@ export default function BattleArena({
 
   return (
     <div className="battle-arena" style={{ background: 'var(--bg-card)', borderRadius: 12, marginBottom: 12 }}>
-      {renderFighter(attackerAvatar, attackerClass, attackerName, attackerHp, attackerMaxHp, leftAnim, false)}
+      {renderFighter(attackerAvatar, attackerClass, attackerName, attackerHp, attackerMaxHp,
+        leftAnim, false, leftPaused, leftFrozenFrame)}
       <div className="arena-vs">VS</div>
-      {renderFighter(defenderAvatar, defenderClass, defenderName, defenderHp, defenderMaxHp, rightAnim, true)}
+      {renderFighter(defenderAvatar, defenderClass, defenderName, defenderHp, defenderMaxHp,
+        rightAnim, true, rightPaused, rightFrozenFrame)}
     </div>
   );
 }

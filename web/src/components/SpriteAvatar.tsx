@@ -9,6 +9,7 @@ interface SpriteAvatarProps {
   scale?: number;
   flip?: boolean;
   paused?: boolean;
+  frozenFrame?: number;
 }
 
 export default function SpriteAvatar({
@@ -17,6 +18,7 @@ export default function SpriteAvatar({
   scale = 1,
   flip = false,
   paused = false,
+  frozenFrame,
 }: SpriteAvatarProps) {
   const avatar = getAvatarById(avatarId);
   const [frame, setFrame] = useState(0);
@@ -24,13 +26,18 @@ export default function SpriteAvatar({
   const anim = SPRITE.animations[animation] || SPRITE.animations.idle;
 
   useEffect(() => {
-    if (paused) return;
+    if (paused) {
+      if (frozenFrame !== undefined) {
+        setFrame(Math.min(frozenFrame, anim.frames - 1));
+      }
+      return;
+    }
     setFrame(0);
     const interval = setInterval(() => {
       setFrame(prev => (prev + 1) % anim.frames);
     }, anim.speed / anim.frames);
     return () => clearInterval(interval);
-  }, [animation, anim.frames, anim.speed, paused]);
+  }, [animation, anim.frames, anim.speed, paused, frozenFrame]);
 
   if (!avatar) {
     return <div style={{ width: 48 * scale, height: 48 * scale, background: '#333', borderRadius: 4 }} />;

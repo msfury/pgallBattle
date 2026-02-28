@@ -59,13 +59,20 @@ export interface Character {
   equipments: Equipment[];
 }
 
-export interface ShopItem {
-  id: number;
+export interface ShopPotionItem {
+  index: number;
   name: string;
   description: string;
   price: number;
-  buffType: string;
-  buffChance: number;
+  effects: string[];
+  sold: boolean;
+}
+
+export interface ShopResponse {
+  items: ShopPotionItem[];
+  refreshCost: number;
+  refreshCount: number;
+  gold: number;
 }
 
 export interface BattleResult {
@@ -94,12 +101,12 @@ export const api = {
   getCharacter: (id: number) => request<Character>(`/characters/${id}`),
   gacha: (characterId: number) =>
     request<Equipment>(`/gacha/${characterId}`, { method: 'POST' }),
-  getShopItems: () => request<ShopItem[]>('/shop/items'),
-  buyItem: (characterId: number, shopItemId: number) =>
-    request<unknown>('/shop/buy', {
-      method: 'POST',
-      body: JSON.stringify({ characterId, shopItemId }),
-    }),
+  getShop: (characterId: number) =>
+    request<ShopResponse>(`/shop/${characterId}/items`),
+  refreshShop: (characterId: number) =>
+    request<ShopResponse>(`/shop/${characterId}/refresh`, { method: 'POST' }),
+  buyPotion: (characterId: number, index: number) =>
+    request<ShopResponse>(`/shop/${characterId}/buy/${index}`, { method: 'POST' }),
   battle: (attackerId: number, defenderId: number) =>
     request<BattleResult>('/battle', {
       method: 'POST',
