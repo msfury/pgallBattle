@@ -10,6 +10,7 @@ web/dist/
 web/node_modules/
 
 # Logs
+logs/
 api/logs/
 
 # OS
@@ -21,6 +22,7 @@ Thumbs.db
 *.local
 /.claude/
 
-# SQLite WAL/SHM (runtime files)
+# SQLite
+*.db
 *.db-shm
 *.db-wal
