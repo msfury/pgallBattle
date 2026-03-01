@@ -310,6 +310,11 @@ public class BattleService {
         int goldReward = calcGoldReward(winner.getEloRate(), loser.getEloRate(), random);
         winner.setGold(winner.getGold() + goldReward);
 
+        int loserGoldReward = calcLoserGoldReward(loser.getEloRate(), winner.getEloRate(), random);
+        if (loserGoldReward > 0) {
+            loser.setGold(loser.getGold() + loserGoldReward);
+        }
+
         // SOUL_HARVEST
         if (winner == attacker && hasEffect(atkEffects, EquipmentEffect.SOUL_HARVEST)) {
             int heal = 5; log.add(attacker.getName() + "의 영혼 수확! HP +" + heal);
@@ -328,6 +333,9 @@ public class BattleService {
 
         log.add("=== 전투 종료 ===");
         log.add(winner.getName() + " 승리! +" + goldReward + " 골드");
+        if (loserGoldReward > 0) {
+            log.add(loser.getName() + " 패배 위로금 +" + loserGoldReward + " 골드");
+        }
         log.add("ELO: " + winner.getName() + " +" + winnerDelta + " (" + winner.getEloRate() + ") | "
                 + loser.getName() + " " + loserDelta + " (" + loser.getEloRate() + ")");
 
@@ -343,7 +351,7 @@ public class BattleService {
         return BattleResponse.builder()
                 .winnerId(winner.getId()).winnerName(winner.getName())
                 .loserId(loser.getId()).loserName(loser.getName())
-                .battleLog(log).goldReward(goldReward)
+                .battleLog(log).goldReward(goldReward).loserGoldReward(loserGoldReward)
                 .attackerName(attacker.getName()).defenderName(defender.getName())
                 .attackerAvatar(attacker.getAvatar()).defenderAvatar(defender.getAvatar())
                 .attackerClass(attacker.getCharacterClass() != null ? attacker.getCharacterClass().name() : null)
@@ -734,15 +742,22 @@ public class BattleService {
     private int calcGoldReward(int winnerElo, int loserElo, ThreadLocalRandom random) {
         // 기본 보상: ELO 구간별
         int base;
-        if (winnerElo >= 1500) base = 30;
-        else if (winnerElo >= 1200) base = 20;
-        else base = 10;
+        if (winnerElo >= 1500) base = 160;
+        else if (winnerElo >= 1200) base = 100;
+        else base = 60;
 
-        // 상대가 나보다 강할수록 보너스 (최대 +20)
+        // 상대가 나보다 강할수록 보너스 (최대 +100)
         int eloDiff = loserElo - winnerElo;
-        int bonus = Math.max(0, Math.min(20, eloDiff / 20));
+        int bonus = Math.max(0, Math.min(100, eloDiff / 10));
 
-        return base + bonus + random.nextInt(10);
+        return base + bonus + random.nextInt(40);
+    }
+
+    /** 패배 시 위로 골드: ELO 차이 30 이상일 때 (차이-30)*3 골드 */
+    private int calcLoserGoldReward(int loserElo, int winnerElo, ThreadLocalRandom random) {
+        int eloDiff = winnerElo - loserElo;
+        if (eloDiff < 30) return 0;
+        return (eloDiff - 30) * 3;
     }
 
     /** 장착된 장비의 특정 스탯 보너스 합계 */
