@@ -25,4 +25,7 @@ public class Inventory {
 
     @Builder.Default
     private int quantity = 1;
+
+    @Builder.Default
+    private boolean equipped = false;
 }

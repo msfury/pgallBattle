@@ -119,6 +119,11 @@ input:focus { border-color: var(--primary); }
 .slot-label { font-size: 0.7rem; color: var(--text-dim); margin-bottom: 4px; }
 .slot-empty { color: rgba(255,255,255,0.2); font-size: 0.75rem; }
 
+/* Potion slots - 5 slots in 1 row */
+.potion-slot-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.potion-slot { background: rgba(255,255,255,0.03); border: 1px dashed rgba(46,204,113,0.2); border-radius: 8px; padding: 6px 4px; text-align: center; min-height: 70px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.potion-slot.filled { border-color: var(--green); border-style: solid; background: rgba(46,204,113,0.05); }
+
 /* Battle Arena */
 .battle-arena { display: flex; justify-content: space-between; align-items: flex-start; padding: 16px 8px; position: relative; overflow: hidden; min-height: 200px; }
 .arena-fighter { display: flex; flex-direction: column; align-items: center; width: 40%; z-index: 2; }

@@ -3,6 +3,7 @@ package com.pgall.battle.controller;
 import com.pgall.battle.dto.*;
 import com.pgall.battle.filter.IpOwnershipFilter;
 import com.pgall.battle.service.CharacterService;
+import com.pgall.battle.service.EnhanceService;
 import com.pgall.battle.service.EquipService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -20,6 +21,7 @@ public class CharacterController {
 
     private final CharacterService characterService;
     private final EquipService equipService;
+    private final EnhanceService enhanceService;
     private final com.pgall.battle.repository.GameCharacterRepository characterRepository;
 
     @GetMapping("/random-stats")
@@ -83,5 +85,37 @@ public class CharacterController {
     @PutMapping("/{charId}/equipment/{equipId}/unequip")
     public ResponseEntity<EquipmentResponse> unequip(@PathVariable Long charId, @PathVariable Long equipId) {
         return ResponseEntity.ok(equipService.unequip(charId, equipId));
+    }
+
+    // ===== 물약 장착/해제/판매 =====
+
+    @PutMapping("/{charId}/potion/{invId}/equip")
+    public ResponseEntity<Map<String, Object>> equipPotion(@PathVariable Long charId, @PathVariable Long invId) {
+        equipService.equipPotion(charId, invId);
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    @PutMapping("/{charId}/potion/{invId}/unequip")
+    public ResponseEntity<Map<String, Object>> unequipPotion(@PathVariable Long charId, @PathVariable Long invId) {
+        equipService.unequipPotion(charId, invId);
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    @PostMapping("/{charId}/potion/{invId}/sell")
+    public ResponseEntity<Map<String, Object>> sellPotion(@PathVariable Long charId, @PathVariable Long invId) {
+        int price = equipService.sellPotion(charId, invId);
+        return ResponseEntity.ok(Map.of("soldPrice", price));
+    }
+
+    // ===== 무기 강화 =====
+
+    @PostMapping("/{charId}/equipment/{equipId}/enhance")
+    public ResponseEntity<EnhanceResponse> enhance(@PathVariable Long charId, @PathVariable Long equipId) {
+        return ResponseEntity.ok(enhanceService.enhance(charId, equipId));
+    }
+
+    @GetMapping("/{charId}/equipment/{equipId}/enhance-info")
+    public ResponseEntity<EnhanceResponse> enhanceInfo(@PathVariable Long charId, @PathVariable Long equipId) {
+        return ResponseEntity.ok(enhanceService.getInfo(equipId));
     }
 }

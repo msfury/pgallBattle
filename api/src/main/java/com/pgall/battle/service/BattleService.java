@@ -69,9 +69,9 @@ public class BattleService {
             log.add(defender.getName() + "의 무기: " + defWeapon.getName() + " (" + info + ")");
         }
 
-        // 물약 (인벤토리) 로드
-        List<Inventory> atkPotions = inventoryRepository.findByCharacterId(attacker.getId());
-        List<Inventory> defPotions = inventoryRepository.findByCharacterId(defender.getId());
+        // 물약 (장착된 물약만) 로드
+        List<Inventory> atkPotions = inventoryRepository.findByCharacterIdAndEquipped(attacker.getId(), true);
+        List<Inventory> defPotions = inventoryRepository.findByCharacterIdAndEquipped(defender.getId(), true);
         Set<BuffType> atkBuffsUsed = new HashSet<>();
         Set<BuffType> defBuffsUsed = new HashSet<>();
 
@@ -301,7 +301,7 @@ public class BattleService {
             log.add("20라운드 경과! HP가 더 많은 " + winner.getName() + " 판정승!");
         }
 
-        int goldReward = 10 + random.nextInt(20);
+        int goldReward = calcGoldReward(winner.getEloRate(), loser.getEloRate(), random);
         winner.setGold(winner.getGold() + goldReward);
 
         // SOUL_HARVEST
@@ -629,14 +629,22 @@ public class BattleService {
         return v != null ? v[1] : 0;
     }
 
-    /** 장착된 장비 효과 수집 → {effect: [chance, value]} */
+    /** 장착된 장비 효과 수집 → {effect: [chance, value]} (강화 효과 포함) */
     private Map<EquipmentEffect, int[]> collectEffects(GameCharacter character) {
         Map<EquipmentEffect, int[]> effects = new HashMap<>();
         for (Equipment eq : character.getEquipments()) {
-            if (!eq.isEquipped() || eq.getEffect() == null) continue;
-            effects.merge(eq.getEffect(),
-                    new int[]{eq.getEffectChance(), eq.getEffectValue()},
-                    (a, b) -> new int[]{Math.max(a[0], b[0]), a[1] + b[1]});
+            if (!eq.isEquipped()) continue;
+            if (eq.getEffect() != null) {
+                effects.merge(eq.getEffect(),
+                        new int[]{eq.getEffectChance(), eq.getEffectValue()},
+                        (a, b) -> new int[]{Math.max(a[0], b[0]), a[1] + b[1]});
+            }
+            // 강화 효과도 수집
+            for (var ee : eq.getEnhanceEffects()) {
+                effects.merge(ee.getEffect(),
+                        new int[]{ee.getEffectChance(), ee.getEffectValue()},
+                        (a, b) -> new int[]{Math.max(a[0], b[0]), a[1] + b[1]});
+            }
         }
         return effects;
     }
@@ -650,10 +658,10 @@ public class BattleService {
     private int getAttackModifier(GameCharacter character, Equipment weapon) {
         if (weapon == null || weapon.getScalingStat() == null) return mod(character.getStrength());
         return switch (weapon.getScalingStat()) {
-            case STR -> mod(character.getStrength());
-            case DEX -> mod(character.getDexterity());
-            case INT -> mod(character.getIntelligence());
-            case WIS -> mod(character.getWisdom());
+            case STR -> mod(character.getStrength()) + mod(character.getDexterity()); // 힘 + 민첩 보정
+            case DEX -> mod(character.getDexterity()) + 2;   // 민첩 무기 명중 보정
+            case INT -> mod(character.getIntelligence()) + 2; // 마법 무기 명중 보정
+            case WIS -> mod(character.getWisdom()) + 2;       // 신성 무기 명중 보정
         };
     }
 
@@ -694,6 +702,21 @@ public class BattleService {
 
     private int getTotalDefense(GameCharacter c) {
         return c.getEquipments().stream().filter(Equipment::isEquipped).mapToInt(Equipment::getDefenseBonus).sum();
+    }
+
+    /** ELO 기반 골드 보상: 높은 ELO일수록 보상 증가, 상대 ELO가 높을수록 보너스 */
+    private int calcGoldReward(int winnerElo, int loserElo, ThreadLocalRandom random) {
+        // 기본 보상: ELO 구간별
+        int base;
+        if (winnerElo >= 1500) base = 30;
+        else if (winnerElo >= 1200) base = 20;
+        else base = 10;
+
+        // 상대가 나보다 강할수록 보너스 (최대 +20)
+        int eloDiff = loserElo - winnerElo;
+        int bonus = Math.max(0, Math.min(20, eloDiff / 20));
+
+        return base + bonus + random.nextInt(10);
     }
 
     private int mod(int stat) { return (stat - 10) / 2; }

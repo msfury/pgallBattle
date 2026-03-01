@@ -116,13 +116,6 @@ public class ShopService {
             if (index < 0 || index >= session.potions.size()) throw new IllegalArgumentException("잘못된 아이템입니다.");
             if (session.sold[index]) throw new IllegalStateException("이미 매진된 아이템입니다.");
 
-            // 물약 보유량 체크
-            List<Inventory> owned = inventoryRepository.findByCharacterId(characterId);
-            int totalPotions = owned.stream().mapToInt(Inventory::getQuantity).sum();
-            if (totalPotions >= MAX_POTIONS) {
-                throw new IllegalStateException("물약은 최대 " + MAX_POTIONS + "개까지 보유할 수 있습니다.");
-            }
-
             PotionDef potion = session.potions.get(index);
             if (character.getGold() < potion.price) {
                 throw new IllegalStateException("골드 부족 (필요: " + potion.price + "G)");
@@ -140,12 +133,13 @@ public class ShopService {
                     .buffChance(100)
                     .build());
 
-            // Inventory 추가
+            // Inventory 추가 + 장착 슬롯 여유 있으면 자동 장착
+            boolean autoEquip = inventoryRepository.countByCharacterIdAndEquipped(characterId, true) < 5;
             inventoryRepository.findByCharacterIdAndShopItemId(characterId, shopItem.getId())
                     .ifPresentOrElse(
                             inv -> { inv.setQuantity(inv.getQuantity() + 1); inventoryRepository.save(inv); },
                             () -> inventoryRepository.save(Inventory.builder()
-                                    .character(character).shopItem(shopItem).quantity(1).build())
+                                    .character(character).shopItem(shopItem).quantity(1).equipped(autoEquip).build())
                     );
 
             characterRepository.save(character);
