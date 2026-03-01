@@ -9,7 +9,7 @@ services:
       - /data/APP-DATA/pgallBattle/data:/data:Z
       - /data/APP-DATA/pgallBattle/logs:/app/logs:Z
     ports:
-      - "8280:8280"
+      - "8280:8080"
 
   web:
     build: ./web

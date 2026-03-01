@@ -11,5 +11,5 @@ WORKDIR /app
 COPY --from=build /app/build/libs/*.jar app.jar
 RUN mkdir -p /data /app/logs
 ENV SQLITE_PATH=/data/pgallbattle.db
-EXPOSE 8280
+EXPOSE 8080
 CMD ["java", "--enable-native-access=ALL-UNNAMED", "-jar", "/app/app.jar"]
