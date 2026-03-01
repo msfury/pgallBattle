@@ -17,6 +17,11 @@ const GRADE_ORDER: Record<string, number> = {
   LEGENDARY: 0, EPIC: 1, RARE: 2, UNCOMMON: 3, COMMON: 4,
 };
 
+function equipScore(eq: Equipment): number {
+  const gradeVal: Record<string, number> = { COMMON: 0, UNCOMMON: 1, RARE: 2, EPIC: 3, LEGENDARY: 4 };
+  return (eq.attackBonus + eq.defenseBonus) * (1 + eq.enhanceLevel * 0.3) + (gradeVal[eq.grade] ?? 0);
+}
+
 const GRADE_LABEL: Record<string, string> = {
   LEGENDARY: '전설', EPIC: '에픽', RARE: '레어', UNCOMMON: '언커먼', COMMON: '커먼',
 };
@@ -150,6 +155,9 @@ export default function MyPage() {
   const [isOwner, setIsOwner] = useState(false);
   const [myCharId, setMyCharId] = useState<number | null>(null);
 
+  // 장비 비교 모달 상태
+  const [compareModal, setCompareModal] = useState<{ newEquip: Equipment; oldEquip: Equipment } | null>(null);
+
   // 강화 모달 상태
   const [enhanceTarget, setEnhanceTarget] = useState<Equipment | null>(null);
   const [enhanceInfo, setEnhanceInfo] = useState<EnhanceResult | null>(null);
@@ -191,13 +199,58 @@ export default function MyPage() {
     }).catch(() => {});
   }, [myId, isOwner]);
 
-  const handleEquip = async (equipId: number) => {
+  const doEquip = async (equipId: number) => {
     try {
       setError('');
       await api.equipItem(myId, equipId);
       await loadChar();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '장착 실패');
+    }
+  };
+
+  const handleEquip = (equipId: number) => {
+    if (!char) return;
+    const newEquip = char.equipments.find(e => e.id === equipId);
+    if (!newEquip) return;
+
+    // 같은 타입의 장착 중인 장비 찾기
+    const equipped = char.equipments.filter(e => e.type === newEquip.type && e.equipped);
+    if (equipped.length === 0) {
+      doEquip(equipId);
+      return;
+    }
+
+    // 교체 대상 찾기 (백엔드 로직과 동일)
+    let target: Equipment | null = null;
+    if (newEquip.type === 'WEAPON') {
+      const hasTwoHanded = equipped.find(e => e.twoHanded);
+      if (newEquip.twoHanded) {
+        // 양손무기 장착 → 기존 중 가장 좋은 것과 비교
+        target = equipped.reduce((a, b) => equipScore(a) > equipScore(b) ? a : b);
+      } else if (hasTwoHanded) {
+        target = hasTwoHanded;
+      } else if (equipped.length >= 2) {
+        // 한손 2개 → 점수 낮은 것이 교체 대상
+        target = equipped.reduce((a, b) => equipScore(a) < equipScore(b) ? a : b);
+      } else {
+        // 슬롯 여유 있음
+        doEquip(equipId);
+        return;
+      }
+    } else {
+      const maxSlots = newEquip.type === 'EARRING' || newEquip.type === 'RING' ? 2 : 1;
+      if (equipped.length < maxSlots) {
+        doEquip(equipId);
+        return;
+      }
+      target = equipped.reduce((a, b) => equipScore(a) < equipScore(b) ? a : b);
+    }
+
+    if (target && equipScore(newEquip) < equipScore(target)) {
+      setCompareModal({ newEquip, oldEquip: target });
+    } else {
+      doEquip(equipId);
     }
   };
 
@@ -694,6 +747,56 @@ export default function MyPage() {
           </button>
         </div>
       )}
+
+      {/* ===== 장비 비교 모달 ===== */}
+      {compareModal && (() => {
+        const { newEquip, oldEquip } = compareModal;
+        const renderStat = (eq: Equipment) => (
+          <div style={{ flex: 1, padding: 8, background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>
+            <div className={GRADE_CLASS[eq.grade]} style={{ fontWeight: 'bold', fontSize: '0.9rem', marginBottom: 4 }}>
+              {eq.enhanceLevel > 0 && `+${eq.enhanceLevel} `}{eq.name}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#999', marginBottom: 4 }}>{GRADE_LABEL[eq.grade]}</div>
+            {eq.attackBonus > 0 && <div style={{ fontSize: '0.8rem', color: '#e74c3c' }}>ATK +{eq.attackBonus}</div>}
+            {eq.defenseBonus > 0 && <div style={{ fontSize: '0.8rem', color: '#3498db' }}>DEF +{eq.defenseBonus}</div>}
+            {eq.type === 'WEAPON' && eq.baseDamageMax > 0 && (
+              <div style={{ fontSize: '0.8rem', color: '#f39c12' }}>DMG {eq.baseDamageMin}-{eq.baseDamageMax}</div>
+            )}
+            <div style={{ fontSize: '0.75rem', color: '#aaa', marginTop: 4 }}>
+              점수: {equipScore(eq).toFixed(1)}
+            </div>
+          </div>
+        );
+        return (
+          <div className="modal-overlay" onClick={() => setCompareModal(null)}>
+            <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 360 }}>
+              <h3 style={{ textAlign: 'center', marginBottom: 8, color: '#e74c3c' }}>
+                현재 장비보다 안좋은 장비입니다
+              </h3>
+              <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#999', marginBottom: 12 }}>
+                그래도 장착하시겠습니까?
+              </p>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#2ecc71', marginBottom: 4 }}>현재 장비</div>
+                  {renderStat(oldEquip)}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', fontSize: '1.2rem', color: '#666' }}>→</div>
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#e74c3c', marginBottom: 4 }}>장착할 장비</div>
+                  {renderStat(newEquip)}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn-full" style={{ background: '#555' }}
+                  onClick={() => setCompareModal(null)}>취소</button>
+                <button className="btn-full btn-red"
+                  onClick={() => { setCompareModal(null); doEquip(newEquip.id); }}>장착</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ===== 강화 모달 ===== */}
       {enhanceModalOpen && enhanceTarget && enhanceInfo && (

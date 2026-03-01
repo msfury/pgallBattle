@@ -14,6 +14,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.NoSuchElementException;
 
 @Service
@@ -26,6 +29,18 @@ public class EquipService {
     private final GameCharacterRepository characterRepository;
     private final InventoryRepository inventoryRepository;
     private final ShopItemRepository shopItemRepository;
+
+    /** 장비 점수 산출: 강화 레벨, 등급, 공/방 종합 */
+    public static double equipScore(Equipment e) {
+        int gradeVal = switch (e.getGrade()) {
+            case COMMON -> 0;
+            case UNCOMMON -> 1;
+            case RARE -> 2;
+            case EPIC -> 3;
+            case LEGENDARY -> 4;
+        };
+        return (e.getAttackBonus() + e.getDefenseBonus()) * (1 + e.getEnhanceLevel() * 0.3) + gradeVal;
+    }
 
     @Transactional
     public EquipmentResponse equip(Long characterId, Long equipmentId) {
@@ -43,33 +58,48 @@ public class EquipService {
         }
 
         EquipmentType type = equipment.getType();
-        long equippedCount = character.getEquipments().stream()
+        List<Equipment> equippedSameType = character.getEquipments().stream()
                 .filter(e -> e.getType() == type && e.isEquipped())
-                .count();
+                .toList();
 
-        if (equippedCount >= type.getMaxSlots()) {
-            throw new IllegalStateException(type.name() + " 슬롯이 가득 찼습니다. ("
-                    + equippedCount + "/" + type.getMaxSlots() + ")");
-        }
+        List<Equipment> toUnequip = new ArrayList<>();
 
-        // 양손무기 체크
         if (type == EquipmentType.WEAPON) {
-            boolean hasEquippedWeapon = character.getEquipments().stream()
-                    .anyMatch(e -> e.getType() == EquipmentType.WEAPON && e.isEquipped());
+            List<Equipment> equippedWeapons = equippedSameType;
 
-            if (equipment.isTwoHanded() && hasEquippedWeapon) {
-                throw new IllegalStateException("양손 무기는 다른 무기와 함께 장착할 수 없습니다.");
-            }
-
-            if (!equipment.isTwoHanded() && hasEquippedWeapon) {
-                boolean hasTwoHanded = character.getEquipments().stream()
-                        .anyMatch(e -> e.getType() == EquipmentType.WEAPON && e.isEquipped() && e.isTwoHanded());
+            if (equipment.isTwoHanded()) {
+                // 양손무기 장착 → 기존 무기 전부 해제
+                toUnequip.addAll(equippedWeapons);
+            } else if (!equippedWeapons.isEmpty()) {
+                boolean hasTwoHanded = equippedWeapons.stream().anyMatch(Equipment::isTwoHanded);
                 if (hasTwoHanded) {
-                    throw new IllegalStateException("양손 무기가 장착되어 있어 다른 무기를 장착할 수 없습니다.");
+                    // 양손무기 해제 후 한손무기 장착
+                    toUnequip.addAll(equippedWeapons);
+                } else if (equippedWeapons.size() >= type.getMaxSlots()) {
+                    // 한손무기 2개 → 점수가 가장 낮은 것 해제
+                    Equipment worst = equippedWeapons.stream()
+                            .min(Comparator.comparingDouble(EquipService::equipScore))
+                            .orElse(null);
+                    if (worst != null) toUnequip.add(worst);
                 }
             }
+        } else {
+            // 기타 장비: 슬롯 가득 차면 점수 가장 낮은 것 해제
+            if (equippedSameType.size() >= type.getMaxSlots()) {
+                Equipment worst = equippedSameType.stream()
+                        .min(Comparator.comparingDouble(EquipService::equipScore))
+                        .orElse(null);
+                if (worst != null) toUnequip.add(worst);
+            }
         }
 
+        // 해제 처리
+        for (Equipment e : toUnequip) {
+            e.setEquipped(false);
+            equipmentRepository.save(e);
+        }
+
+        // 장착 처리
         equipment.setEquipped(true);
         equipmentRepository.save(equipment);
         return EquipmentResponse.from(equipment);
