@@ -28,7 +28,7 @@ pgallBattle/
 │   ├── build.gradle
 │   └── src/main/java/com/pgall/battle/
 │       ├── config/                          # CORS, Security, 예외 핸들러, DB 마이그레이션
-│       ├── entity/                          # GameCharacter, Equipment, EnhanceEffect, Inventory, ShopItem, BattleLog
+│       ├── entity/                          # GameCharacter, Equipment, EnhanceEffect, BaseEffect, Inventory, ShopItem, BattleLog
 │       ├── enums/                           # CharacterClass, EquipmentType/Grade/Effect, BuffType, WeaponCategory, ScalingStat
 │       ├── repository/                      # JPA Repository
 │       ├── service/
@@ -42,6 +42,8 @@ pgallBattle/
 │       │   └── DailyScheduleService.java    # 매일 0시 스케줄
 │       ├── controller/                      # REST 엔드포인트
 │       ├── dto/                             # 요청/응답 DTO
+│       ├── data/
+│       │   └── WeaponNameData.java          # 무기 이름 데이터
 │       └── filter/
 │           └── IpOwnershipFilter.java       # IP 기반 소유권 검증
 │
@@ -93,7 +95,7 @@ Vite 프록시가 `/api/*` 요청을 `localhost:8080`으로 전달한다.
 
 ### Docker 배포
 ```bash
-docker-compose up --build    # API: 8080, Web: 80
+docker-compose up --build    # API: 8280, Web: 82
 ```
 
 SQLite DB는 Docker named volume(`pgall-data`)에 저장되어 컨테이너 재시작 시에도 유지된다.
