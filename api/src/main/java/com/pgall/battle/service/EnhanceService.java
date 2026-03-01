@@ -5,7 +5,6 @@ import com.pgall.battle.entity.EnhanceEffect;
 import com.pgall.battle.entity.Equipment;
 import com.pgall.battle.entity.GameCharacter;
 import com.pgall.battle.enums.EquipmentEffect;
-import com.pgall.battle.enums.EquipmentType;
 import com.pgall.battle.repository.EquipmentRepository;
 import com.pgall.battle.repository.GameCharacterRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,10 +20,7 @@ public class EnhanceService {
 
     private final EquipmentRepository equipmentRepository;
     private final GameCharacterRepository characterRepository;
-
-    private static final List<EquipmentEffect> WEAPON_EFFECTS =
-            Arrays.stream(EquipmentEffect.values())
-                    .filter(e -> e.getCategory() == EquipmentEffect.Category.WEAPON).toList();
+    private final GachaService gachaService;
 
     @Transactional
     public EnhanceResponse enhance(Long characterId, Long equipmentId) {
@@ -35,9 +31,6 @@ public class EnhanceService {
 
         if (!eq.getCharacter().getId().equals(characterId)) {
             throw new IllegalArgumentException("이 캐릭터의 장비가 아닙니다.");
-        }
-        if (eq.getType() != EquipmentType.WEAPON) {
-            throw new IllegalStateException("무기만 강화할 수 있습니다.");
         }
 
         int currentLevel = eq.getEnhanceLevel();
@@ -65,41 +58,69 @@ public class EnhanceService {
             int delta = newBonus - oldBonus;
 
             if (delta > 0) {
-                eq.setAttackBonus(eq.getAttackBonus() + delta);
-                eq.setBaseDamageMin(eq.getBaseDamageMin() + delta);
-                eq.setBaseDamageMax(eq.getBaseDamageMax() + delta);
-            }
-
-            // 효과 추가 (마일스톤 달성 시)
-            int oldEffects = getEffectCount(currentLevel);
-            int newEffects = getEffectCount(newLevel);
-            int effectDelta = newEffects - oldEffects;
-            if (effectDelta > 0) {
-                addRandomEffects(eq, effectDelta, random);
+                if (eq.getBaseDamageMax() > 0) {
+                    // 무기: ATK + 데미지 증가
+                    eq.setAttackBonus(eq.getAttackBonus() + delta);
+                    eq.setBaseDamageMin(eq.getBaseDamageMin() + delta);
+                    eq.setBaseDamageMax(eq.getBaseDamageMax() + delta);
+                } else {
+                    // 비무기: DEF만 증가
+                    eq.setDefenseBonus(eq.getDefenseBonus() + delta);
+                }
             }
 
             eq.setEnhanceLevel(newLevel);
-            // 이름에 강화 표시 업데이트
             eq.setName(updateEnhanceName(eq.getName(), newLevel));
-            equipmentRepository.save(eq);
 
-            return EnhanceResponse.builder()
+            // 강화 효과 슬롯 체크 (+4부터 +3간격)
+            int newSlots = getEnhanceEffectSlots(newLevel);
+            eq.setEnhanceEffectSlots(newSlots);
+
+            EnhanceResponse.EnhanceResponseBuilder builder = EnhanceResponse.builder()
                     .success(true).broken(false)
                     .newLevel(newLevel).cost(cost)
-                    .message("강화 성공! +" + newLevel)
-                    .build();
+                    .message("강화 성공! +" + newLevel);
+
+            // +4 이상: 매 강화 시 새 효과 생성
+            if (newLevel >= 4 && newSlots > 0) {
+                List<EnhanceResponse.EffectOption> candidates = generateCandidateEffects(eq, 1, random);
+                int currentCount = eq.getEnhanceEffects().size();
+
+                if (currentCount < newSlots && !candidates.isEmpty()) {
+                    // 빈 슬롯 있음 → 자동 추가
+                    EnhanceResponse.EffectOption candidate = candidates.get(0);
+                    eq.getEnhanceEffects().add(EnhanceEffect.builder()
+                            .equipment(eq)
+                            .effect(candidate.getEffect())
+                            .effectChance(candidate.getEffectChance())
+                            .effectValue(candidate.getEffectValue())
+                            .build());
+                    builder.message("강화 성공! +" + newLevel + " [" + candidate.getEffectName() + " 효과 추가]");
+                } else if (!candidates.isEmpty()) {
+                    // 슬롯 꽉 참 → 기존 + 후보 중 선택 필요
+                    List<EnhanceResponse.EffectOption> current = getCurrentEnhanceEffects(eq);
+                    builder.needsEffectSelection(true)
+                            .maxEnhanceEffects(newSlots)
+                            .currentEnhanceEffects(current)
+                            .candidateEffects(candidates);
+                }
+            }
+
+            equipmentRepository.save(eq);
+
+            return builder.build();
         } else {
             // 실패 - 깨짐 판정
             int breakRoll = random.nextInt(100);
             if (breakRoll < breakChance) {
-                // 무기 파괴!
+                // 장비 파괴!
                 character.getEquipments().remove(eq);
                 equipmentRepository.delete(eq);
 
                 return EnhanceResponse.builder()
                         .success(false).broken(true)
                         .newLevel(0).cost(cost)
-                        .message("강화 실패! 무기가 파괴되었습니다!")
+                        .message("강화 실패! 장비가 파괴되었습니다!")
                         .build();
             } else {
                 return EnhanceResponse.builder()
@@ -109,6 +130,39 @@ public class EnhanceService {
                         .build();
             }
         }
+    }
+
+    /** 효과 선택 확정 */
+    @Transactional
+    public void confirmEffects(Long characterId, Long equipmentId, List<String> selectedEffects) {
+        Equipment eq = equipmentRepository.findById(equipmentId)
+                .orElseThrow(() -> new NoSuchElementException("장비를 찾을 수 없습니다."));
+
+        if (!eq.getCharacter().getId().equals(characterId)) {
+            throw new IllegalArgumentException("이 캐릭터의 장비가 아닙니다.");
+        }
+
+        int maxSlots = eq.getEnhanceEffectSlots();
+        if (selectedEffects.size() > maxSlots) {
+            throw new IllegalArgumentException("최대 " + maxSlots + "개까지 선택 가능합니다.");
+        }
+
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+
+        // 기존 강화 효과 전체 교체
+        eq.getEnhanceEffects().clear();
+
+        for (String effectName : selectedEffects) {
+            EquipmentEffect effect = EquipmentEffect.valueOf(effectName);
+            eq.getEnhanceEffects().add(EnhanceEffect.builder()
+                    .equipment(eq)
+                    .effect(effect)
+                    .effectChance(10 + random.nextInt(20))
+                    .effectValue(2 + random.nextInt(4))
+                    .build());
+        }
+
+        equipmentRepository.save(eq);
     }
 
     /** 강화 정보 조회 */
@@ -124,12 +178,13 @@ public class EnhanceService {
                 .successRate(getSuccessRate(level))
                 .breakChance(getBreakChance(level))
                 .nextStatBonus(getStatBonus(level + 1) - getStatBonus(level))
+                .maxEnhanceEffects(getEnhanceEffectSlots(level))
+                .currentEnhanceEffects(getCurrentEnhanceEffects(eq))
                 .build();
     }
 
     // ===== 강화 계산 =====
 
-    /** 강화 비용 */
     int getEnhanceCost(int currentLevel) {
         if (currentLevel < 3) return 5;
         if (currentLevel < 6) return 10;
@@ -137,7 +192,6 @@ public class EnhanceService {
         return 100;
     }
 
-    /** 성공 확률 (%) */
     int getSuccessRate(int currentLevel) {
         if (currentLevel < 3) return 80;
         if (currentLevel < 6) return 60;
@@ -145,7 +199,6 @@ public class EnhanceService {
         return 30;
     }
 
-    /** 파괴 확률 (%) - 실패 시에만 적용 */
     int getBreakChance(int currentLevel) {
         if (currentLevel < 3) return 0;
         if (currentLevel < 6) return 5;
@@ -154,49 +207,66 @@ public class EnhanceService {
     }
 
     /**
-     * 피보나치형 스탯 보너스 (마일스톤 +3 단위)
-     * +3: 1, +6: 3, +9: 5, +12: 8, +15: 13, +18: 21, ...
+     * 선형 스탯 보너스 (마일스톤 +3 단위)
+     * +3: 1, +6: 2, +9: 3, +12: 4, +15: 5, +18: 6, ...
      */
     int getStatBonus(int enhanceLevel) {
         int milestone = enhanceLevel / 3;
-        if (milestone <= 0) return 0;
-        if (milestone == 1) return 1;
-        if (milestone == 2) return 3;
-        if (milestone == 3) return 5;
-        int prev2 = 3, prev1 = 5;
-        for (int i = 4; i <= milestone; i++) {
-            int next = prev1 + prev2;
-            prev2 = prev1;
-            prev1 = next;
-        }
-        return prev1;
+        return milestone;
     }
 
     /**
-     * 장비 효과 개수 (마일스톤 +6부터)
-     * +6: 1, +9: 3, +12: 5, +15: 7, ...
+     * 강화 효과 슬롯 수 (+4부터 시작, +3 간격)
+     * +4: 1, +7: 2, +10: 3, +13: 4, ...
      */
-    int getEffectCount(int enhanceLevel) {
-        int milestone = enhanceLevel / 3;
-        if (milestone < 2) return 0;
-        return 2 * (milestone - 1) - 1;
+    int getEnhanceEffectSlots(int enhanceLevel) {
+        if (enhanceLevel < 4) return 0;
+        return (enhanceLevel - 4) / 3 + 1;
     }
 
-    private void addRandomEffects(Equipment eq, int count, ThreadLocalRandom random) {
-        for (int i = 0; i < count; i++) {
-            EquipmentEffect effect = WEAPON_EFFECTS.get(random.nextInt(WEAPON_EFFECTS.size()));
-            int chance = 10 + random.nextInt(20); // 10~29%
-            int value = 2 + random.nextInt(4); // 2~5
-            EnhanceEffect ee = EnhanceEffect.builder()
-                    .equipment(eq).effect(effect)
-                    .effectChance(chance).effectValue(value)
-                    .build();
-            eq.getEnhanceEffects().add(ee);
+    /** 후보 효과 생성 (장비 타입에 맞는 풀에서) */
+    private List<EnhanceResponse.EffectOption> generateCandidateEffects(Equipment eq, int count, ThreadLocalRandom random) {
+        List<EquipmentEffect> pool = gachaService.getEffectPool(eq.getType());
+        Set<EquipmentEffect> used = new HashSet<>();
+        // 기존 강화 효과 제외
+        eq.getEnhanceEffects().forEach(ee -> used.add(ee.getEffect()));
+
+        List<EnhanceResponse.EffectOption> candidates = new ArrayList<>();
+        for (int i = 0; i < count && used.size() < pool.size(); i++) {
+            EquipmentEffect effect;
+            do {
+                effect = pool.get(random.nextInt(pool.size()));
+            } while (used.contains(effect));
+            used.add(effect);
+
+            candidates.add(EnhanceResponse.EffectOption.builder()
+                    .index(i)
+                    .effect(effect)
+                    .effectName(effect.getKoreanName())
+                    .effectChance(10 + random.nextInt(20))
+                    .effectValue(2 + random.nextInt(4))
+                    .build());
         }
+        return candidates;
+    }
+
+    /** 현재 강화 효과 목록 */
+    private List<EnhanceResponse.EffectOption> getCurrentEnhanceEffects(Equipment eq) {
+        List<EnhanceResponse.EffectOption> list = new ArrayList<>();
+        int i = 0;
+        for (var ee : eq.getEnhanceEffects()) {
+            list.add(EnhanceResponse.EffectOption.builder()
+                    .index(i++)
+                    .effect(ee.getEffect())
+                    .effectName(ee.getEffect().getKoreanName())
+                    .effectChance(ee.getEffectChance())
+                    .effectValue(ee.getEffectValue())
+                    .build());
+        }
+        return list;
     }
 
     private String updateEnhanceName(String name, int level) {
-        // 기존 강화 표시 제거
         String base = name.replaceAll("\\s*\\+\\d+$", "");
         return base + " +" + level;
     }

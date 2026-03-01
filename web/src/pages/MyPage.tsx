@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { api, type Character, type Equipment, type InventoryItem, type EnhanceResult } from '../api/client';
+import { api, type Character, type Equipment, type InventoryItem, type EnhanceResult, type EffectOption } from '../api/client';
 import { CLASS_EMOJI, CLASS_COLOR } from '../data/classes';
 import SpriteAvatar from '../components/SpriteAvatar';
 
@@ -70,7 +70,6 @@ const POTION_EMOJI: Record<string, string> = {
   ACCURACY_POTION: '🎯', HASTE_POTION: '💨', IRON_SKIN_POTION: '🛡️', BLESS_POTION: '🙏',
 };
 
-// 인벤토리 타입 그룹
 const TYPE_GROUPS = [
   { label: '무기', types: ['WEAPON'] },
   { label: '방어구', types: ['HELMET', 'ARMOR', 'GLOVES', 'SHOES'] },
@@ -87,8 +86,17 @@ export default function MyPage() {
   const [toast, setToast] = useState('');
   const [isOwner, setIsOwner] = useState(false);
   const [myCharId, setMyCharId] = useState<number | null>(null);
+
+  // 강화 모달 상태
   const [enhanceTarget, setEnhanceTarget] = useState<Equipment | null>(null);
   const [enhanceInfo, setEnhanceInfo] = useState<EnhanceResult | null>(null);
+  const [enhanceModalOpen, setEnhanceModalOpen] = useState(false);
+  // 효과 선택 상태
+  const [effectSelectionMode, setEffectSelectionMode] = useState(false);
+  const [candidateEffects, setCandidateEffects] = useState<EffectOption[]>([]);
+  const [currentEnhanceEffects, setCurrentEnhanceEffects] = useState<EffectOption[]>([]);
+  const [maxEnhanceEffects, setMaxEnhanceEffects] = useState(0);
+  const [selectedEffects, setSelectedEffects] = useState<Set<string>>(new Set());
 
   const loadChar = useCallback(() => api.getCharacter(myId).then(setChar).catch(e => {
     setError(e instanceof Error ? e.message : '로딩 실패');
@@ -142,7 +150,6 @@ export default function MyPage() {
 
   const handleSell = async (eq: Equipment) => {
     const price = SELL_PRICE[eq.grade] || 5;
-    // 레어급 이상만 확인 얼럿
     const isRareOrAbove = (GRADE_ORDER[eq.grade] ?? 4) <= 2;
     if (isRareOrAbove && !confirm(`"${eq.name}"을(를) ${price}G에 판매하시겠습니까?`)) return;
     try {
@@ -154,7 +161,6 @@ export default function MyPage() {
     }
   };
 
-  // 물약 핸들러
   const handleEquipPotion = async (invId: number) => {
     try {
       setError('');
@@ -185,15 +191,25 @@ export default function MyPage() {
     }
   };
 
-  // 강화 핸들러
+  // 강화 모달 열기
   const openEnhance = async (eq: Equipment) => {
     try {
       const info = await api.enhanceInfo(myId, eq.id);
       setEnhanceTarget(eq);
       setEnhanceInfo(info);
+      setEnhanceModalOpen(true);
+      setEffectSelectionMode(false);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '강화 정보 조회 실패');
     }
+  };
+
+  const closeEnhanceModal = () => {
+    setEnhanceModalOpen(false);
+    setEnhanceTarget(null);
+    setEnhanceInfo(null);
+    setEffectSelectionMode(false);
+    setSelectedEffects(new Set());
   };
 
   const handleEnhance = async () => {
@@ -203,16 +219,27 @@ export default function MyPage() {
       const result = await api.enhance(myId, enhanceTarget.id);
       if (result.broken) {
         setToast(result.message);
-        setEnhanceTarget(null);
-        setEnhanceInfo(null);
+        closeEnhanceModal();
       } else if (result.success) {
         setToast(result.message);
-        // 강화 후 최신 캐릭터 & 무기 정보 갱신
-        const refreshed = await api.getCharacter(myId);
-        const updatedWeapon = refreshed.equipments.find(e => e.id === enhanceTarget.id);
-        if (updatedWeapon) setEnhanceTarget(updatedWeapon);
-        const info = await api.enhanceInfo(myId, enhanceTarget.id);
-        setEnhanceInfo(info);
+        // 효과 선택이 필요한 경우
+        if (result.needsEffectSelection && result.candidateEffects) {
+          setEffectSelectionMode(true);
+          setCandidateEffects(result.candidateEffects);
+          setCurrentEnhanceEffects(result.currentEnhanceEffects || []);
+          setMaxEnhanceEffects(result.maxEnhanceEffects);
+          // 기존 효과 선택 상태로 초기화
+          const initial = new Set<string>();
+          (result.currentEnhanceEffects || []).forEach(e => initial.add(e.effect));
+          setSelectedEffects(initial);
+        } else {
+          // 효과 선택 불필요 → 정보 갱신
+          const refreshed = await api.getCharacter(myId);
+          const updatedEq = refreshed.equipments.find(e => e.id === enhanceTarget.id);
+          if (updatedEq) setEnhanceTarget(updatedEq);
+          const info = await api.enhanceInfo(myId, enhanceTarget.id);
+          setEnhanceInfo(info);
+        }
       } else {
         setToast(result.message);
       }
@@ -223,12 +250,42 @@ export default function MyPage() {
     }
   };
 
+  const toggleEffectSelection = (effectName: string) => {
+    setSelectedEffects(prev => {
+      const next = new Set(prev);
+      if (next.has(effectName)) {
+        next.delete(effectName);
+      } else if (next.size < maxEnhanceEffects) {
+        next.add(effectName);
+      }
+      return next;
+    });
+  };
+
+  const confirmEffectSelection = async () => {
+    if (!enhanceTarget) return;
+    try {
+      await api.confirmEnhanceEffects(myId, enhanceTarget.id, Array.from(selectedEffects));
+      setToast('강화 효과가 적용되었습니다!');
+      setEffectSelectionMode(false);
+      await loadChar();
+      // 모달 정보 갱신
+      const refreshed = await api.getCharacter(myId);
+      const updatedEq = refreshed.equipments.find(e => e.id === enhanceTarget.id);
+      if (updatedEq) setEnhanceTarget(updatedEq);
+      const info = await api.enhanceInfo(myId, enhanceTarget.id);
+      setEnhanceInfo(info);
+      setTimeout(() => setToast(''), 3000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '효과 선택 실패');
+    }
+  };
+
   if (!char) return <div className="text-center mt-16">{error || '로딩 중...'}</div>;
 
   const equippedItems = char.equipments.filter(e => e.equipped);
   const unequippedItems = char.equipments.filter(e => !e.equipped);
 
-  // 양손무기 감지
   const equippedWeapons = equippedItems.filter(e => e.type === 'WEAPON');
   const twoHandedWeapon = equippedWeapons.find(e => e.twoHanded);
 
@@ -236,7 +293,6 @@ export default function MyPage() {
   const usedIds = new Set<number>();
   for (const slot of SLOT_LAYOUT) {
     if (slot.type === 'WEAPON' && slot.label === '무기 2' && twoHandedWeapon) {
-      // 양손무기: 무기 2 슬롯에도 같은 무기 표시
       slotItems.push(twoHandedWeapon);
     } else {
       const item = equippedItems.find(e => e.type === slot.type && !usedIds.has(e.id));
@@ -245,7 +301,6 @@ export default function MyPage() {
     }
   }
 
-  // 물약 슬롯 데이터
   const equippedPotions = (char.potions || []).filter(p => p.equipped);
   const unequippedPotions = (char.potions || []).filter(p => !p.equipped);
   const potionSlots: (InventoryItem | null)[] = [];
@@ -253,7 +308,6 @@ export default function MyPage() {
     potionSlots.push(equippedPotions[i] || null);
   }
 
-  // 인벤토리를 타입 그룹별 + 등급순으로 정렬
   const sortedUnequipped = [...unequippedItems].sort((a, b) => {
     const ga = GRADE_ORDER[a.grade] ?? 4;
     const gb = GRADE_ORDER[b.grade] ?? 4;
@@ -266,28 +320,60 @@ export default function MyPage() {
     { label: 'WIS 지혜', value: char.wisdom }, { label: 'CHA 매력', value: char.charisma },
   ];
 
-  const renderEquipItem = (eq: Equipment) => (
-    <div style={{ fontSize: '0.65rem', color: '#999', marginTop: 2 }}>
-      {eq.attackBonus > 0 && <span style={{ color: '#e74c3c' }}>ATK+{eq.attackBonus} </span>}
-      {eq.defenseBonus > 0 && <span style={{ color: '#3498db' }}>DEF+{eq.defenseBonus} </span>}
-      {eq.type === 'WEAPON' && eq.baseDamageMax > 0 && (
-        <span style={{ color: '#f39c12' }}>DMG:{eq.baseDamageMin}-{eq.baseDamageMax} </span>
-      )}
-      {eq.enhanceLevel > 0 && (
-        <span style={{ color: '#ffd700' }}>+{eq.enhanceLevel} </span>
-      )}
-    </div>
-  );
+  const renderEffects = (eq: Equipment) => {
+    const allEffects = [
+      ...(eq.baseEffects || []).map(e => ({ ...e, source: 'base' as const })),
+      ...(eq.enhanceEffects || []).map(e => ({ ...e, source: 'enhance' as const })),
+    ];
+    if (eq.effect && !allEffects.length) {
+      // 레거시 단일 효과
+      return (
+        <div style={{ fontSize: '0.6rem', color: '#f39c12' }}>
+          [{EFFECT_NAMES[eq.effect] || eq.effect} {eq.effectChance}%]
+        </div>
+      );
+    }
+    return allEffects.map((e, i) => (
+      <div key={i} style={{ fontSize: '0.6rem', color: e.source === 'enhance' ? '#e74c3c' : '#f39c12' }}>
+        [{EFFECT_NAMES[e.effect] || e.effect} {e.effectChance}%]{e.source === 'enhance' ? ' +강화' : ''}
+      </div>
+    ));
+  };
+
+  const renderEquipStats = (eq: Equipment) => {
+    const statBonuses: string[] = [];
+    if (eq.bonusStrength > 0) statBonuses.push(`STR+${eq.bonusStrength}`);
+    if (eq.bonusDexterity > 0) statBonuses.push(`DEX+${eq.bonusDexterity}`);
+    if (eq.bonusConstitution > 0) statBonuses.push(`CON+${eq.bonusConstitution}`);
+    if (eq.bonusIntelligence > 0) statBonuses.push(`INT+${eq.bonusIntelligence}`);
+    if (eq.bonusWisdom > 0) statBonuses.push(`WIS+${eq.bonusWisdom}`);
+    if (eq.bonusCharisma > 0) statBonuses.push(`CHA+${eq.bonusCharisma}`);
+    return (
+      <div style={{ fontSize: '0.65rem', color: '#999', marginTop: 2 }}>
+        {eq.attackBonus > 0 && <span style={{ color: '#e74c3c' }}>ATK+{eq.attackBonus} </span>}
+        {eq.defenseBonus > 0 && <span style={{ color: '#3498db' }}>DEF+{eq.defenseBonus} </span>}
+        {eq.type === 'WEAPON' && eq.baseDamageMax > 0 && (
+          <span style={{ color: '#f39c12' }}>DMG:{eq.baseDamageMin}-{eq.baseDamageMax} </span>
+        )}
+        {eq.enhanceLevel > 0 && (
+          <span style={{ color: '#ffd700' }}>+{eq.enhanceLevel} </span>
+        )}
+        {statBonuses.length > 0 && (
+          <span style={{ color: '#2ecc71' }}>{statBonuses.join(' ')} </span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div>
-      {/* 일급 토스트 */}
+      {/* 토스트 */}
       {toast && (
         <div style={{
           position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
           background: 'linear-gradient(135deg, #f39c12, #e67e22)', color: '#fff',
           padding: '12px 24px', borderRadius: 12, fontWeight: 'bold', fontSize: '0.95rem',
-          zIndex: 9999, boxShadow: '0 4px 20px rgba(243,156,18,0.4)',
+          zIndex: 20000, boxShadow: '0 4px 20px rgba(243,156,18,0.4)',
           animation: 'toast-slide 0.3s ease-out',
         }}>
           {toast}
@@ -362,12 +448,8 @@ export default function MyPage() {
                     <div className={GRADE_CLASS[item.grade]} style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>
                       {item.name}
                     </div>
-                    {renderEquipItem(item)}
-                    {item.effect && (
-                      <div style={{ fontSize: '0.6rem', color: '#f39c12' }}>
-                        [{EFFECT_NAMES[item.effect] || item.effect} {item.effectChance}%]
-                      </div>
-                    )}
+                    {renderEquipStats(item)}
+                    {renderEffects(item)}
                     {isTwoHandedSlot2 && (
                       <div style={{ fontSize: '0.6rem', color: '#9b59b6' }}>(양손무기)</div>
                     )}
@@ -375,10 +457,8 @@ export default function MyPage() {
                       <div style={{ display: 'flex', gap: 3, justifyContent: 'center', marginTop: 4 }}>
                         <button className="btn-sm btn-red"
                           onClick={() => handleUnequip(item.id)}>해제</button>
-                        {item.type === 'WEAPON' && (
-                          <button className="btn-sm btn-blue"
-                            onClick={() => openEnhance(item)}>강화</button>
-                        )}
+                        <button className="btn-sm btn-blue"
+                          onClick={() => openEnhance(item)}>강화</button>
                       </div>
                     )}
                   </div>
@@ -390,49 +470,6 @@ export default function MyPage() {
           })}
         </div>
       </div>
-
-      {/* 강화 패널 */}
-      {enhanceTarget && enhanceInfo && (
-        <div className="card mb-12" style={{ border: '1px solid rgba(243,156,18,0.5)', background: 'rgba(243,156,18,0.05)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <h2 style={{ margin: 0 }}>🔨 무기 강화</h2>
-            <button className="btn-sm" style={{ background: '#555', color: '#fff', border: 'none', cursor: 'pointer', borderRadius: 4 }}
-              onClick={() => { setEnhanceTarget(null); setEnhanceInfo(null); }}>닫기</button>
-          </div>
-          <div style={{ textAlign: 'center', marginBottom: 12 }}>
-            <div className={GRADE_CLASS[enhanceTarget.grade]} style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
-              {enhanceTarget.name}
-            </div>
-            <div style={{ fontSize: '0.8rem', color: '#999', marginTop: 4 }}>
-              ATK+{enhanceTarget.attackBonus} | DMG:{enhanceTarget.baseDamageMin}-{enhanceTarget.baseDamageMax}
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 6, padding: 8, textAlign: 'center' }}>
-              <div style={{ fontSize: '0.7rem', color: '#999' }}>비용</div>
-              <div style={{ fontSize: '1rem', color: '#ffd700', fontWeight: 'bold' }}>{enhanceInfo.cost}G</div>
-            </div>
-            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 6, padding: 8, textAlign: 'center' }}>
-              <div style={{ fontSize: '0.7rem', color: '#999' }}>성공률</div>
-              <div style={{ fontSize: '1rem', color: '#2ecc71', fontWeight: 'bold' }}>{enhanceInfo.successRate}%</div>
-            </div>
-            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 6, padding: 8, textAlign: 'center' }}>
-              <div style={{ fontSize: '0.7rem', color: '#999' }}>파괴 확률</div>
-              <div style={{ fontSize: '1rem', color: enhanceInfo.breakChance > 0 ? '#e74c3c' : '#2ecc71', fontWeight: 'bold' }}>
-                {enhanceInfo.breakChance}%
-              </div>
-            </div>
-            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 6, padding: 8, textAlign: 'center' }}>
-              <div style={{ fontSize: '0.7rem', color: '#999' }}>다음 스탯 보너스</div>
-              <div style={{ fontSize: '1rem', color: '#3498db', fontWeight: 'bold' }}>+{enhanceInfo.nextStatBonus}</div>
-            </div>
-          </div>
-          <button className="btn-full btn-gold" onClick={handleEnhance}
-            disabled={!char || char.gold < enhanceInfo.cost}>
-            🔨 강화하기 ({enhanceInfo.cost}G)
-          </button>
-        </div>
-      )}
 
       {/* 물약 장착 슬롯 */}
       <div className="card mb-12">
@@ -469,7 +506,7 @@ export default function MyPage() {
       {/* 인벤토리 - 소유자만 */}
       {isOwner && (
         <>
-          {/* 장비 인벤토리 (타입별 → 등급순) */}
+          {/* 장비 인벤토리 */}
           <div className="card mb-12">
             <h2>인벤토리 - 장비 ({unequippedItems.length})</h2>
             {unequippedItems.length === 0 && (
@@ -493,7 +530,7 @@ export default function MyPage() {
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '0.6rem', padding: '1px 4px', borderRadius: 3,
                             background: `var(--grade-${eq.grade.toLowerCase()})`, color: '#fff' }}>
                             {GRADE_LABEL[eq.grade]}
@@ -502,6 +539,7 @@ export default function MyPage() {
                             {TYPE_EMOJI[eq.type] || ''} {eq.name}
                           </span>
                           {eq.twoHanded && <span style={{ fontSize: '0.6rem', color: '#9b59b6' }}>(양손)</span>}
+                          {eq.enhanceLevel > 0 && <span style={{ fontSize: '0.6rem', color: '#ffd700' }}>+{eq.enhanceLevel}</span>}
                         </div>
                         <div style={{ fontSize: '0.7rem', color: '#999', marginTop: 2 }}>
                           {eq.attackBonus > 0 && <span style={{ color: '#e74c3c' }}>ATK+{eq.attackBonus} </span>}
@@ -509,16 +547,22 @@ export default function MyPage() {
                           {eq.type === 'WEAPON' && eq.baseDamageMax > 0 && (
                             <span style={{ color: '#f39c12' }}>DMG:{eq.baseDamageMin}-{eq.baseDamageMax} </span>
                           )}
-                          {eq.effect && (
-                            <span style={{ color: '#f39c12' }}>[{EFFECT_NAMES[eq.effect] || eq.effect} {eq.effectChance}%]</span>
-                          )}
+                          {(() => {
+                            const s: string[] = [];
+                            if (eq.bonusStrength > 0) s.push(`STR+${eq.bonusStrength}`);
+                            if (eq.bonusDexterity > 0) s.push(`DEX+${eq.bonusDexterity}`);
+                            if (eq.bonusConstitution > 0) s.push(`CON+${eq.bonusConstitution}`);
+                            if (eq.bonusIntelligence > 0) s.push(`INT+${eq.bonusIntelligence}`);
+                            if (eq.bonusWisdom > 0) s.push(`WIS+${eq.bonusWisdom}`);
+                            if (eq.bonusCharisma > 0) s.push(`CHA+${eq.bonusCharisma}`);
+                            return s.length > 0 ? <span style={{ color: '#2ecc71' }}>{s.join(' ')} </span> : null;
+                          })()}
                         </div>
+                        <div>{renderEffects(eq)}</div>
                       </div>
                       <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                         <button className="btn-sm btn-green" onClick={() => handleEquip(eq.id)}>장착</button>
-                        {eq.type === 'WEAPON' && (
-                          <button className="btn-sm btn-blue" onClick={() => openEnhance(eq)}>강화</button>
-                        )}
+                        <button className="btn-sm btn-blue" onClick={() => openEnhance(eq)}>강화</button>
                         <button className="btn-sm" style={{
                           background: '#e67e22', color: '#fff', border: 'none', cursor: 'pointer',
                           padding: '4px 8px', borderRadius: 4, fontSize: '0.7rem',
@@ -566,7 +610,7 @@ export default function MyPage() {
 
       {error && <p className="error mb-12">{error}</p>}
 
-      {/* 캐릭터 삭제 - 소유자만 */}
+      {/* 캐릭터 삭제 */}
       {isOwner && (
         <div className="card mb-12" style={{ borderColor: 'rgba(231,76,60,0.3)' }}>
           <button className="btn-full btn-red" onClick={async () => {
@@ -581,6 +625,156 @@ export default function MyPage() {
           }}>
             캐릭터 삭제
           </button>
+        </div>
+      )}
+
+      {/* ===== 강화 모달 ===== */}
+      {enhanceModalOpen && enhanceTarget && enhanceInfo && (
+        <div className="modal-overlay" onClick={closeEnhanceModal}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h2 style={{ margin: 0 }}>🔨 장비 강화</h2>
+              <button onClick={closeEnhanceModal} style={{
+                background: 'none', border: 'none', color: '#999', fontSize: '1.5rem', cursor: 'pointer',
+              }}>✕</button>
+            </div>
+
+            {/* 장비 정보 */}
+            <div style={{ textAlign: 'center', marginBottom: 16, padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+              <div style={{ fontSize: '0.7rem', color: '#999' }}>
+                {TYPE_EMOJI[enhanceTarget.type]} {TYPE_LABEL[enhanceTarget.type] || enhanceTarget.type}
+              </div>
+              <div className={GRADE_CLASS[enhanceTarget.grade]} style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: 4 }}>
+                {enhanceTarget.name}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#999', marginTop: 4 }}>
+                {enhanceTarget.attackBonus > 0 && <span style={{ color: '#e74c3c' }}>ATK+{enhanceTarget.attackBonus} </span>}
+                {enhanceTarget.defenseBonus > 0 && <span style={{ color: '#3498db' }}>DEF+{enhanceTarget.defenseBonus} </span>}
+                {enhanceTarget.type === 'WEAPON' && enhanceTarget.baseDamageMax > 0 && (
+                  <span style={{ color: '#f39c12' }}>DMG:{enhanceTarget.baseDamageMin}-{enhanceTarget.baseDamageMax} </span>
+                )}
+                {(() => {
+                  const s: string[] = [];
+                  if (enhanceTarget.bonusStrength > 0) s.push(`STR+${enhanceTarget.bonusStrength}`);
+                  if (enhanceTarget.bonusDexterity > 0) s.push(`DEX+${enhanceTarget.bonusDexterity}`);
+                  if (enhanceTarget.bonusConstitution > 0) s.push(`CON+${enhanceTarget.bonusConstitution}`);
+                  if (enhanceTarget.bonusIntelligence > 0) s.push(`INT+${enhanceTarget.bonusIntelligence}`);
+                  if (enhanceTarget.bonusWisdom > 0) s.push(`WIS+${enhanceTarget.bonusWisdom}`);
+                  if (enhanceTarget.bonusCharisma > 0) s.push(`CHA+${enhanceTarget.bonusCharisma}`);
+                  return s.length > 0 ? <span style={{ color: '#2ecc71' }}>{s.join(' ')}</span> : null;
+                })()}
+              </div>
+              {/* 현재 효과 표시 */}
+              <div style={{ marginTop: 8 }}>{renderEffects(enhanceTarget)}</div>
+            </div>
+
+            {!effectSelectionMode ? (
+              <>
+                {/* 강화 정보 */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+                  <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 6, padding: 10, textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#999' }}>비용</div>
+                    <div style={{ fontSize: '1.1rem', color: '#ffd700', fontWeight: 'bold' }}>{enhanceInfo.cost}G</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 6, padding: 10, textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#999' }}>성공률</div>
+                    <div style={{ fontSize: '1.1rem', color: '#2ecc71', fontWeight: 'bold' }}>{enhanceInfo.successRate}%</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 6, padding: 10, textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#999' }}>파괴 확률</div>
+                    <div style={{ fontSize: '1.1rem', color: enhanceInfo.breakChance > 0 ? '#e74c3c' : '#2ecc71', fontWeight: 'bold' }}>
+                      {enhanceInfo.breakChance}%
+                    </div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 6, padding: 10, textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#999' }}>다음 스탯 보너스</div>
+                    <div style={{ fontSize: '1.1rem', color: '#3498db', fontWeight: 'bold' }}>+{enhanceInfo.nextStatBonus}</div>
+                  </div>
+                </div>
+
+                {/* 강화 효과 슬롯 정보 */}
+                {(enhanceInfo.maxEnhanceEffects > 0 || (enhanceInfo.currentEnhanceEffects && enhanceInfo.currentEnhanceEffects.length > 0)) && (
+                  <div style={{ marginBottom: 12, padding: '8px 12px', background: 'rgba(231,76,60,0.1)', borderRadius: 6 }}>
+                    <div style={{ fontSize: '0.75rem', color: '#e74c3c', fontWeight: 'bold', marginBottom: 4 }}>
+                      강화 효과 ({(enhanceInfo.currentEnhanceEffects || []).length}/{enhanceInfo.maxEnhanceEffects})
+                    </div>
+                    {(enhanceInfo.currentEnhanceEffects || []).map((e, i) => (
+                      <div key={i} style={{ fontSize: '0.7rem', color: '#e74c3c' }}>
+                        [{EFFECT_NAMES[e.effect] || e.effectName} {e.effectChance}%]
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <button className="btn-full btn-gold" onClick={handleEnhance}
+                  disabled={!char || char.gold < enhanceInfo.cost}
+                  style={{ padding: '12px', fontSize: '1rem' }}>
+                  🔨 강화하기 ({enhanceInfo.cost}G)
+                </button>
+              </>
+            ) : (
+              /* 효과 선택 모드 */
+              <div>
+                <div style={{ fontSize: '0.85rem', color: '#f39c12', fontWeight: 'bold', marginBottom: 8 }}>
+                  강화 효과를 선택하세요 ({selectedEffects.size}/{maxEnhanceEffects})
+                </div>
+                <div style={{ fontSize: '0.7rem', color: '#999', marginBottom: 12 }}>
+                  기존 효과와 새 후보 중에서 최대 {maxEnhanceEffects}개를 선택할 수 있습니다.
+                </div>
+
+                {/* 기존 강화 효과 */}
+                {currentEnhanceEffects.length > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: '0.7rem', color: '#999', marginBottom: 4 }}>기존 효과</div>
+                    {currentEnhanceEffects.map((e, i) => (
+                      <div key={`current-${i}`}
+                        onClick={() => toggleEffectSelection(e.effect)}
+                        style={{
+                          padding: '8px 12px', marginBottom: 4, borderRadius: 6, cursor: 'pointer',
+                          background: selectedEffects.has(e.effect) ? 'rgba(231,76,60,0.2)' : 'rgba(255,255,255,0.05)',
+                          border: selectedEffects.has(e.effect) ? '1px solid #e74c3c' : '1px solid transparent',
+                        }}>
+                        <div style={{ fontSize: '0.8rem', color: '#e74c3c', fontWeight: 'bold' }}>
+                          {selectedEffects.has(e.effect) ? '✓ ' : ''}{EFFECT_NAMES[e.effect] || e.effectName}
+                        </div>
+                        <div style={{ fontSize: '0.65rem', color: '#999' }}>
+                          발동 {e.effectChance}% | 수치 {e.effectValue}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 새 후보 효과 */}
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: '0.7rem', color: '#999', marginBottom: 4 }}>새 후보 효과</div>
+                  {candidateEffects.map((e, i) => (
+                    <div key={`candidate-${i}`}
+                      onClick={() => toggleEffectSelection(e.effect)}
+                      style={{
+                        padding: '8px 12px', marginBottom: 4, borderRadius: 6, cursor: 'pointer',
+                        background: selectedEffects.has(e.effect) ? 'rgba(46,204,113,0.2)' : 'rgba(255,255,255,0.05)',
+                        border: selectedEffects.has(e.effect) ? '1px solid #2ecc71' : '1px solid transparent',
+                      }}>
+                      <div style={{ fontSize: '0.8rem', color: '#2ecc71', fontWeight: 'bold' }}>
+                        {selectedEffects.has(e.effect) ? '✓ ' : ''}{EFFECT_NAMES[e.effect] || e.effectName}
+                        <span style={{ fontSize: '0.65rem', color: '#f39c12', marginLeft: 4 }}>NEW</span>
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: '#999' }}>
+                        발동 {e.effectChance}% | 수치 {e.effectValue}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button className="btn-full btn-gold" onClick={confirmEffectSelection}
+                  disabled={selectedEffects.size === 0}
+                  style={{ padding: '12px', fontSize: '1rem' }}>
+                  효과 확정 ({selectedEffects.size}/{maxEnhanceEffects})
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

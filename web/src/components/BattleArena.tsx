@@ -14,6 +14,8 @@ interface BattleArenaProps {
   defenderName: string;
   attackerMaxHp: number;
   defenderMaxHp: number;
+  attackerFinalHp?: number;
+  defenderFinalHp?: number;
   currentLog: string | null;
   logIndex: number;
   battleFinished: boolean;
@@ -27,6 +29,7 @@ interface BattleArenaProps {
 export default function BattleArena({
   attackerAvatar, defenderAvatar, attackerClass, defenderClass,
   attackerName, defenderName, attackerMaxHp, defenderMaxHp,
+  attackerFinalHp, defenderFinalHp,
   currentLog, logIndex, battleFinished, winnerId, attackerId, defenderId,
   attackerPotions, defenderPotions,
 }: BattleArenaProps) {
@@ -40,9 +43,13 @@ export default function BattleArena({
   const [rightFrozenFrame, setRightFrozenFrame] = useState<number | undefined>(undefined);
   const [usedPotions, setUsedPotions] = useState<Set<string>>(new Set());
 
-  // Battle finished: freeze sprites
+  // Battle finished: freeze sprites + set final HP
   useEffect(() => {
     if (!battleFinished || winnerId === null) return;
+
+    // 전투 종료 시 서버에서 받은 최종 HP로 갱신
+    if (attackerFinalHp !== undefined) setAttackerHp(attackerFinalHp);
+    if (defenderFinalHp !== undefined) setDefenderHp(defenderFinalHp);
 
     const attackerWon = winnerId === attackerId;
 

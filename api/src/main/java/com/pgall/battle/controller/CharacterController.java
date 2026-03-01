@@ -118,4 +118,14 @@ public class CharacterController {
     public ResponseEntity<EnhanceResponse> enhanceInfo(@PathVariable Long charId, @PathVariable Long equipId) {
         return ResponseEntity.ok(enhanceService.getInfo(equipId));
     }
+
+    @PostMapping("/{charId}/equipment/{equipId}/enhance-effects")
+    public ResponseEntity<Map<String, Object>> confirmEnhanceEffects(
+            @PathVariable Long charId, @PathVariable Long equipId,
+            @RequestBody Map<String, Object> body) {
+        @SuppressWarnings("unchecked")
+        List<String> selectedEffects = (List<String>) body.get("selectedEffects");
+        enhanceService.confirmEffects(charId, equipId, selectedEffects);
+        return ResponseEntity.ok(Map.of("success", true));
+    }
 }
