@@ -14,6 +14,7 @@ public class BattleResponse {
     private String loserName;
     private List<String> battleLog;
     private int goldReward;
+    private int loserGoldReward;
     private String attackerName;
     private String defenderName;
     private String attackerAvatar;
