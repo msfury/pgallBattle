@@ -58,7 +58,7 @@ public class BattleService {
         log.add("=== 전투 시작 ===");
         String atkClass = attacker.getCharacterClass() != null ? " [" + attacker.getCharacterClass().getKoreanName() + "]" : "";
         String defClass = defender.getCharacterClass() != null ? " [" + defender.getCharacterClass().getKoreanName() + "]" : "";
-        log.add(attacker.getName() + atkClass + " (HP:" + atkHp + ") vs " + defender.getName() + defClass + " (HP:" + defHp + ")");
+        log.add(attacker.getName() + atkClass + " [HP:" + atkHp + "] vs " + defender.getName() + defClass + " [HP:" + defHp + "]");
 
         if (atkWeapon != null) {
             String info = atkWeapon.getWeaponCategory() != null ? atkWeapon.getWeaponCategory().getKoreanName() : "무기";
@@ -85,23 +85,27 @@ public class BattleService {
         Map<EquipmentEffect, int[]> atkEffects = collectEffects(attacker);
         Map<EquipmentEffect, int[]> defEffects = collectEffects(defender);
 
-        // AC 계산
-        int atkAC = 10 + mod(attacker.getDexterity()) + getTotalDefense(attacker);
-        int defAC = 10 + mod(defender.getDexterity()) + getTotalDefense(defender);
+        // 장비 스탯 보너스
+        int atkDexB = getEquipStatBonus(attacker, Equipment::getBonusDexterity);
+        int defDexB = getEquipStatBonus(defender, Equipment::getBonusDexterity);
+        int atkConB = getEquipStatBonus(attacker, Equipment::getBonusConstitution);
+        int defConB = getEquipStatBonus(defender, Equipment::getBonusConstitution);
 
-        // 직업 보너스 AC
-        if (attacker.getCharacterClass() == CharacterClass.CLERIC) atkAC += 1;
-        if (defender.getCharacterClass() == CharacterClass.CLERIC) defAC += 1;
-        if (attacker.getCharacterClass() == CharacterClass.ROGUE) atkAC += 1;
-        if (defender.getCharacterClass() == CharacterClass.ROGUE) defAC += 1;
+        // CON 보너스 → HP 증가
+        if (atkConB > 0) { atkHp += atkConB * 2; atkMaxHp += atkConB * 2; }
+        if (defConB > 0) { defHp += defConB * 2; defMaxHp += defConB * 2; }
+
+        // AC 계산 (방어력 캡 8, DEX 장비보너스는 AC에 미반영)
+        int atkAC = 10 + mod(attacker.getDexterity()) + Math.min(getTotalDefense(attacker), 8);
+        int defAC = 10 + mod(defender.getDexterity()) + Math.min(getTotalDefense(defender), 8);
 
         // 전투 시작 전 효과 적용
-        // DODGE_BOOST
-        atkAC += getEffectValue(atkEffects, EquipmentEffect.DODGE_BOOST);
-        defAC += getEffectValue(defEffects, EquipmentEffect.DODGE_BOOST);
-        // FORTIFY
-        atkAC += getEffectValue(atkEffects, EquipmentEffect.FORTIFY);
-        defAC += getEffectValue(defEffects, EquipmentEffect.FORTIFY);
+        // DODGE_BOOST (절반만 반영)
+        atkAC += getEffectValue(atkEffects, EquipmentEffect.DODGE_BOOST) / 2;
+        defAC += getEffectValue(defEffects, EquipmentEffect.DODGE_BOOST) / 2;
+        // FORTIFY (절반만 반영)
+        atkAC += getEffectValue(atkEffects, EquipmentEffect.FORTIFY) / 2;
+        defAC += getEffectValue(defEffects, EquipmentEffect.FORTIFY) / 2;
         // ENDURANCE (최대HP 증가)
         int atkEndurance = getEffectValue(atkEffects, EquipmentEffect.ENDURANCE);
         int defEndurance = getEffectValue(defEffects, EquipmentEffect.ENDURANCE);
@@ -260,14 +264,14 @@ public class BattleService {
             if (hasEffect(atkEffects, EquipmentEffect.HP_REGEN) && atkHp > 0) { int v = val(atkEffects, EquipmentEffect.HP_REGEN); atkHp = Math.min(atkHp + v, atkMaxHp); log.add(attacker.getName() + " HP 재생 +" + v + " (HP:" + atkHp + ")"); }
             if (hasEffect(defEffects, EquipmentEffect.HP_REGEN) && defHp > 0) { int v = val(defEffects, EquipmentEffect.HP_REGEN); defHp = Math.min(defHp + v, defMaxHp); log.add(defender.getName() + " HP 재생 +" + v + " (HP:" + defHp + ")"); }
             // HEALING_AURA
-            if (hasEffect(atkEffects, EquipmentEffect.HEALING_AURA) && atkHp > 0) { int v = 1; atkHp = Math.min(atkHp + v, atkMaxHp); log.add(attacker.getName() + " 치유 오라 +" + v); }
-            if (hasEffect(defEffects, EquipmentEffect.HEALING_AURA) && defHp > 0) { int v = 1; defHp = Math.min(defHp + v, defMaxHp); log.add(defender.getName() + " 치유 오라 +" + v); }
+            if (hasEffect(atkEffects, EquipmentEffect.HEALING_AURA) && atkHp > 0) { int v = 1; atkHp = Math.min(atkHp + v, atkMaxHp); log.add(attacker.getName() + " 치유 오라 +" + v + " (HP:" + atkHp + ")"); }
+            if (hasEffect(defEffects, EquipmentEffect.HEALING_AURA) && defHp > 0) { int v = 1; defHp = Math.min(defHp + v, defMaxHp); log.add(defender.getName() + " 치유 오라 +" + v + " (HP:" + defHp + ")"); }
             // 성직자 힐
             atkHp = applyClassHeal(attacker, atkHp, atkMaxHp, log);
             defHp = applyClassHeal(defender, defHp, defMaxHp, log);
             // SPIRIT_LINK (공유 HP 밸런싱 - 자신 HP 1 회복)
-            if (hasEffect(atkEffects, EquipmentEffect.SPIRIT_LINK) && atkHp > 0 && atkHp < atkMaxHp) { atkHp++; }
-            if (hasEffect(defEffects, EquipmentEffect.SPIRIT_LINK) && defHp > 0 && defHp < defMaxHp) { defHp++; }
+            if (hasEffect(atkEffects, EquipmentEffect.SPIRIT_LINK) && atkHp > 0 && atkHp < atkMaxHp) { atkHp++; log.add(attacker.getName() + " 영혼 연결 +1 (HP:" + atkHp + ")"); }
+            if (hasEffect(defEffects, EquipmentEffect.SPIRIT_LINK) && defHp > 0 && defHp < defMaxHp) { defHp++; log.add(defender.getName() + " 영혼 연결 +1 (HP:" + defHp + ")"); }
 
             // 상태이상 해제 (1턴 후)
             if (atkStunned) atkStunned = false;
@@ -298,7 +302,9 @@ public class BattleService {
         else {
             winner = atkHp >= defHp ? attacker : defender;
             loser = winner == attacker ? defender : attacker;
-            log.add("20라운드 경과! HP가 더 많은 " + winner.getName() + " 판정승!");
+            log.add("20라운드 경과! HP가 더 많은 " + winner.getName() + " 판정승! ("
+                    + attacker.getName() + " HP:" + Math.max(0, atkHp) + "/" + atkMaxHp
+                    + " vs " + defender.getName() + " HP:" + Math.max(0, defHp) + "/" + defMaxHp + ")");
         }
 
         int goldReward = calcGoldReward(winner.getEloRate(), loser.getEloRate(), random);
@@ -343,6 +349,7 @@ public class BattleService {
                 .attackerClass(attacker.getCharacterClass() != null ? attacker.getCharacterClass().name() : null)
                 .defenderClass(defender.getCharacterClass() != null ? defender.getCharacterClass().name() : null)
                 .attackerMaxHp(atkMaxHp).defenderMaxHp(defMaxHp)
+                .attackerFinalHp(Math.max(0, atkHp)).defenderFinalHp(Math.max(0, defHp))
                 .attackerPotions(atkPotionInfos).defenderPotions(defPotionInfos)
                 .build();
     }
@@ -393,6 +400,7 @@ public class BattleService {
         }
 
         int atkMod = disarmed ? 0 : getAttackModifier(atk, atkWeapon);
+        int weaponHitBonus = disarmed ? 0 : getTotalAttack(atk) / 2;
         boolean shieldActive = buffsUsed.contains(BuffType.SHIELD);
 
         // 관통
@@ -401,15 +409,16 @@ public class BattleService {
 
         for (int i = 0; i < attackCount; i++) {
             int attackRoll = roll(20);
-            boolean crit = attackRoll == 20 || (buffsUsed.contains(BuffType.CRIT_DOUBLE) && attackRoll >= 19);
+            boolean isNat20 = attackRoll == 20;
+            boolean crit = isNat20 || (buffsUsed.contains(BuffType.CRIT_DOUBLE) && attackRoll >= 19);
             // CRITICAL_BOOST
             if (!crit && hasEffect(atkEffects, EquipmentEffect.CRITICAL_BOOST) && attackRoll >= 18) crit = true;
             // LUCK
             if (!crit && hasEffect(atkEffects, EquipmentEffect.LUCK) && attackRoll >= 19) crit = true;
 
-            int totalAttack = attackRoll + atkMod - atkDebuff + accuracy;
+            int totalAttack = attackRoll + atkMod + weaponHitBonus - atkDebuff + accuracy;
 
-            if (totalAttack >= effectiveAC) {
+            if (isNat20 || totalAttack >= effectiveAC) {
                 // 방패
                 if (shieldActive) { log.add(def.getName() + "의 방패 발동! 차단!"); shieldActive = false; continue; }
                 // BLOCK_CHANCE
@@ -423,10 +432,10 @@ public class BattleService {
                 }
 
                 // 데미지 계산
-                int damage = disarmed ? 1 : (rollWeaponDamage(atkWeapon, random) + atkMod + getTotalAttack(atk) - atkDebuff);
+                int damage = disarmed ? 1 : (rollWeaponDamage(atkWeapon, random) + atkMod + getWeaponAttack(atk) - atkDebuff);
                 damage += getClassDamageBonus(atk, atkWeapon, round, random);
                 if (damage < 1) damage = 1;
-                if (crit) { damage *= 2; log.add("크리티컬 히트!"); }
+                if (crit) { damage = (int)(damage * 1.5); log.add("크리티컬 히트!"); }
                 if (cursed) damage = (int)(damage * 0.7); // 허약 저주
 
                 // 원소 추가 데미지
@@ -449,7 +458,7 @@ public class BattleService {
                 }
 
                 defHp -= damage;
-                log.add(atk.getName() + " -> " + def.getName() + " (" + attackRoll + " vs AC" + effectiveAC + ") 명중! "
+                log.add(atk.getName() + " -> " + def.getName() + " (" + totalAttack + " vs AC" + effectiveAC + ") 명중! "
                         + damage + " 데미지 (남은HP:" + Math.max(0, defHp) + ")");
 
                 // EXECUTE (HP 20% 이하 즉사)
@@ -497,7 +506,7 @@ public class BattleService {
 
                 if (defHp <= 0) break;
             } else {
-                log.add(atk.getName() + " -> " + def.getName() + " (" + attackRoll + " vs AC" + effectiveAC + ") 빗나감!");
+                log.add(atk.getName() + " -> " + def.getName() + " (" + totalAttack + " vs AC" + effectiveAC + ") 빗나감!");
             }
         }
 
@@ -629,17 +638,24 @@ public class BattleService {
         return v != null ? v[1] : 0;
     }
 
-    /** 장착된 장비 효과 수집 → {effect: [chance, value]} (강화 효과 포함) */
+    /** 장착된 장비 효과 수집 → {effect: [chance, value]} (기본 + 강화 효과) */
     private Map<EquipmentEffect, int[]> collectEffects(GameCharacter character) {
         Map<EquipmentEffect, int[]> effects = new HashMap<>();
         for (Equipment eq : character.getEquipments()) {
             if (!eq.isEquipped()) continue;
+            // 레거시 단일 효과
             if (eq.getEffect() != null) {
                 effects.merge(eq.getEffect(),
                         new int[]{eq.getEffectChance(), eq.getEffectValue()},
                         (a, b) -> new int[]{Math.max(a[0], b[0]), a[1] + b[1]});
             }
-            // 강화 효과도 수집
+            // 기본 효과 (등급별)
+            for (var be : eq.getBaseEffects()) {
+                effects.merge(be.getEffect(),
+                        new int[]{be.getEffectChance(), be.getEffectValue()},
+                        (a, b) -> new int[]{Math.max(a[0], b[0]), a[1] + b[1]});
+            }
+            // 강화 효과
             for (var ee : eq.getEnhanceEffects()) {
                 effects.merge(ee.getEffect(),
                         new int[]{ee.getEffectChance(), ee.getEffectValue()},
@@ -700,6 +716,12 @@ public class BattleService {
         return c.getEquipments().stream().filter(Equipment::isEquipped).mapToInt(Equipment::getAttackBonus).sum();
     }
 
+    private int getWeaponAttack(GameCharacter c) {
+        return c.getEquipments().stream()
+                .filter(e -> e.isEquipped() && e.getType() == EquipmentType.WEAPON)
+                .mapToInt(Equipment::getAttackBonus).sum();
+    }
+
     private int getTotalDefense(GameCharacter c) {
         return c.getEquipments().stream().filter(Equipment::isEquipped).mapToInt(Equipment::getDefenseBonus).sum();
     }
@@ -717,6 +739,11 @@ public class BattleService {
         int bonus = Math.max(0, Math.min(20, eloDiff / 20));
 
         return base + bonus + random.nextInt(10);
+    }
+
+    /** 장착된 장비의 특정 스탯 보너스 합계 */
+    private int getEquipStatBonus(GameCharacter c, java.util.function.ToIntFunction<Equipment> getter) {
+        return c.getEquipments().stream().filter(Equipment::isEquipped).mapToInt(getter).sum();
     }
 
     private int mod(int stat) { return (stat - 10) / 2; }

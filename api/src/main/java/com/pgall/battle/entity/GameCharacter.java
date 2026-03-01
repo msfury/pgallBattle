@@ -67,7 +67,7 @@ public class GameCharacter {
         if (createdAt == null) createdAt = LocalDateTime.now();
         if (maxHp == 0) {
             int baseHp = characterClass != null ? characterClass.getHitDie() : 10;
-            maxHp = baseHp + getModifier(constitution);
+            maxHp = baseHp + constitution + 5;
             if (maxHp < 1) maxHp = 1;
             hp = maxHp;
         }

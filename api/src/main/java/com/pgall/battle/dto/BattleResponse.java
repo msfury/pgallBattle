@@ -22,6 +22,8 @@ public class BattleResponse {
     private String defenderClass;
     private int attackerMaxHp;
     private int defenderMaxHp;
+    private int attackerFinalHp;
+    private int defenderFinalHp;
     private List<PotionInfo> attackerPotions;
     private List<PotionInfo> defenderPotions;
 

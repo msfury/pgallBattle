@@ -30,8 +30,14 @@ public class DatabaseMigration implements ApplicationRunner {
             // inventory 테이블에 equipped 컬럼 추가
             addColumnIfNotExists(conn, "inventory", "equipped", "BOOLEAN DEFAULT 0");
 
+            // equipment 테이블에 enhance_effect_slots 컬럼 추가
+            addColumnIfNotExists(conn, "equipment", "enhance_effect_slots", "INTEGER DEFAULT 0");
+
             // enhance_effect 테이블 생성
             createEnhanceEffectTableIfNotExists(conn);
+
+            // base_effect 테이블 생성
+            createBaseEffectTableIfNotExists(conn);
 
             log.info("Database migration completed successfully.");
         } catch (SQLException e) {
@@ -69,6 +75,23 @@ public class DatabaseMigration implements ApplicationRunner {
         try (Statement stmt = conn.createStatement()) {
             stmt.execute(sql);
             log.info("Ensured enhance_effect table exists.");
+        }
+    }
+
+    private void createBaseEffectTableIfNotExists(Connection conn) throws SQLException {
+        String sql = """
+                CREATE TABLE IF NOT EXISTS base_effect (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    equipment_id BIGINT NOT NULL,
+                    effect VARCHAR(50) NOT NULL,
+                    effect_chance INTEGER DEFAULT 0,
+                    effect_value INTEGER DEFAULT 0,
+                    FOREIGN KEY (equipment_id) REFERENCES equipment(id)
+                )
+                """;
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute(sql);
+            log.info("Ensured base_effect table exists.");
         }
     }
 }

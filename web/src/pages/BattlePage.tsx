@@ -76,6 +76,8 @@ export default function BattlePage() {
           defenderName={result.defenderName}
           attackerMaxHp={result.attackerMaxHp}
           defenderMaxHp={result.defenderMaxHp}
+          attackerFinalHp={result.attackerFinalHp}
+          defenderFinalHp={result.defenderFinalHp}
           currentLog={currentLog}
           logIndex={currentLogIndex}
           battleFinished={battleFinished}

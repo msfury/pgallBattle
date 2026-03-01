@@ -27,5 +27,6 @@ public class Inventory {
     private int quantity = 1;
 
     @Builder.Default
+    @Column(columnDefinition = "boolean default false")
     private boolean equipped = false;
 }

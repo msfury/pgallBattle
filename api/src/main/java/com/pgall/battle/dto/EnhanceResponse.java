@@ -1,6 +1,9 @@
 package com.pgall.battle.dto;
 
+import com.pgall.battle.enums.EquipmentEffect;
 import lombok.*;
+
+import java.util.List;
 
 @Getter @Setter
 @NoArgsConstructor
@@ -16,4 +19,21 @@ public class EnhanceResponse {
     private int successRate;
     private int breakChance;
     private int nextStatBonus;
+    // 효과 선택이 필요한 경우
+    private boolean needsEffectSelection;
+    private int maxEnhanceEffects;
+    private List<EffectOption> currentEnhanceEffects;
+    private List<EffectOption> candidateEffects;
+
+    @Getter @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class EffectOption {
+        private int index;
+        private EquipmentEffect effect;
+        private String effectName;
+        private int effectChance;
+        private int effectValue;
+    }
 }

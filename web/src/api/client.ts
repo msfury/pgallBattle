@@ -21,6 +21,13 @@ export interface Stats {
   charisma: number;
 }
 
+export interface EffectInfo {
+  id: number;
+  effect: string;
+  effectChance: number;
+  effectValue: number;
+}
+
 export interface Equipment {
   id: number;
   name: string;
@@ -38,6 +45,23 @@ export interface Equipment {
   baseDamageMin: number;
   baseDamageMax: number;
   enhanceLevel: number;
+  enhanceEffectSlots: number;
+  baseEffects: EffectInfo[];
+  enhanceEffects: EffectInfo[];
+  bonusStrength: number;
+  bonusDexterity: number;
+  bonusConstitution: number;
+  bonusIntelligence: number;
+  bonusWisdom: number;
+  bonusCharisma: number;
+}
+
+export interface EffectOption {
+  index: number;
+  effect: string;
+  effectName: string;
+  effectChance: number;
+  effectValue: number;
 }
 
 export interface EnhanceResult {
@@ -49,6 +73,10 @@ export interface EnhanceResult {
   successRate: number;
   breakChance: number;
   nextStatBonus: number;
+  needsEffectSelection: boolean;
+  maxEnhanceEffects: number;
+  currentEnhanceEffects: EffectOption[] | null;
+  candidateEffects: EffectOption[] | null;
 }
 
 export interface InventoryItem {
@@ -120,6 +148,8 @@ export interface BattleResult {
   defenderClass: string | null;
   attackerMaxHp: number;
   defenderMaxHp: number;
+  attackerFinalHp: number;
+  defenderFinalHp: number;
   attackerPotions: PotionInfo[];
   defenderPotions: PotionInfo[];
 }
@@ -162,9 +192,14 @@ export const api = {
     request<{ success: boolean }>(`/characters/${characterId}/potion/${inventoryId}/unequip`, { method: 'PUT' }),
   sellPotion: (characterId: number, inventoryId: number) =>
     request<{ soldPrice: number }>(`/characters/${characterId}/potion/${inventoryId}/sell`, { method: 'POST' }),
-  // 무기 강화
+  // 장비 강화
   enhance: (characterId: number, equipmentId: number) =>
     request<EnhanceResult>(`/characters/${characterId}/equipment/${equipmentId}/enhance`, { method: 'POST' }),
   enhanceInfo: (characterId: number, equipmentId: number) =>
     request<EnhanceResult>(`/characters/${characterId}/equipment/${equipmentId}/enhance-info`),
+  confirmEnhanceEffects: (characterId: number, equipmentId: number, selectedEffects: string[]) =>
+    request<{ success: boolean }>(`/characters/${characterId}/equipment/${equipmentId}/enhance-effects`, {
+      method: 'POST',
+      body: JSON.stringify({ selectedEffects }),
+    }),
 };

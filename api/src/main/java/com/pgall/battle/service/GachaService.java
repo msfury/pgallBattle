@@ -2,6 +2,7 @@ package com.pgall.battle.service;
 
 import com.pgall.battle.data.WeaponNameData;
 import com.pgall.battle.dto.EquipmentResponse;
+import com.pgall.battle.entity.BaseEffect;
 import com.pgall.battle.entity.Equipment;
 import com.pgall.battle.entity.GameCharacter;
 import com.pgall.battle.enums.*;
@@ -100,20 +101,19 @@ public class GachaService {
         String name = getGradePrefix(grade) + " " + baseName;
         int dmgMin = category.getDiceCount() + (gradeMultiplier - 1);
         int dmgMax = category.getDiceCount() * category.getDiceSides() + gradeMultiplier;
-        int atkBonus = gradeMultiplier * random.nextInt(1, 4);
+        int atkBonus = gradeMultiplier + random.nextInt(0, gradeMultiplier);
 
-        Equipment.EquipmentBuilder builder = Equipment.builder()
+        Equipment equipment = Equipment.builder()
                 .type(EquipmentType.WEAPON).grade(grade).character(character)
                 .name(name).attackBonus(atkBonus).defenseBonus(0)
                 .weaponCategory(category).scalingStat(category.getScalingStat())
                 .twoHanded(category.isTwoHanded())
-                .baseDamageMin(dmgMin).baseDamageMax(dmgMax);
+                .baseDamageMin(dmgMin).baseDamageMax(dmgMax).build();
 
-        EquipmentEffect effect = rollEffect(EquipmentType.WEAPON, grade);
-        if (effect != null) {
-            builder.effect(effect).effectChance(getEffectChance(grade)).effectValue(getEffectValue(grade));
-        }
-        return equipmentRepository.save(builder.build());
+        int effectCount = getGradeEffectCount(grade);
+        addBaseEffects(equipment, EquipmentType.WEAPON, grade, effectCount, random);
+
+        return equipmentRepository.save(equipment);
     }
 
     private EquipmentGrade rollGrade() {
@@ -157,7 +157,7 @@ public class GachaService {
                 int dmgMin = category.getDiceCount() + (gradeMultiplier - 1);
                 int dmgMax = category.getDiceCount() * category.getDiceSides() + gradeMultiplier;
 
-                atkBonus = gradeMultiplier * random.nextInt(1, 4);
+                atkBonus = gradeMultiplier + random.nextInt(0, gradeMultiplier);
 
                 builder.weaponCategory(category)
                        .scalingStat(category.getScalingStat())
@@ -166,20 +166,19 @@ public class GachaService {
                        .baseDamageMax(dmgMax);
             }
             case HELMET -> {
-                defBonus = gradeMultiplier * random.nextInt(1, 3);
+                defBonus = gradeMultiplier + random.nextInt(0, gradeMultiplier);
                 name = getGradePrefix(grade) + " 투구";
             }
             case ARMOR -> {
-                defBonus = gradeMultiplier * random.nextInt(2, 4);
+                defBonus = gradeMultiplier + random.nextInt(1, gradeMultiplier + 1);
                 name = getGradePrefix(grade) + " 갑옷";
             }
             case GLOVES -> {
-                defBonus = gradeMultiplier * random.nextInt(1, 3);
-                atkBonus = gradeMultiplier;
+                atkBonus = gradeMultiplier + random.nextInt(0, gradeMultiplier);
                 name = getGradePrefix(grade) + " 장갑";
             }
             case SHOES -> {
-                defBonus = gradeMultiplier;
+                atkBonus = random.nextInt(0, gradeMultiplier + 1);
                 name = getGradePrefix(grade) + " 신발";
             }
             case EARRING -> {
@@ -198,35 +197,54 @@ public class GachaService {
                .attackBonus(atkBonus)
                .defenseBonus(defBonus);
 
-        // 효과 부여 - 등급별 확률
-        EquipmentEffect effect = rollEffect(type, grade);
-        if (effect != null) {
-            builder.effect(effect)
-                    .effectChance(getEffectChance(grade))
-                    .effectValue(getEffectValue(grade));
-        }
+        Equipment equipment = builder.build();
 
-        return builder.build();
+        // 등급별 기본 효과 개수: Common=0, Uncommon=1, Rare=2, Epic=3, Legendary=4
+        int effectCount = getGradeEffectCount(grade);
+        addBaseEffects(equipment, type, grade, effectCount, random);
+
+        // 스탯 보너스: 언커먼 이상 또는 장갑/신발
+        addStatBonuses(equipment, grade, type, random);
+
+        return equipment;
     }
 
-    private EquipmentEffect rollEffect(EquipmentType type, EquipmentGrade grade) {
-        ThreadLocalRandom random = ThreadLocalRandom.current();
-
-        // 등급별 효과 획득 확률
-        int chance = switch (grade) {
-            case COMMON, UNCOMMON -> 40;
-            case RARE -> 60;
-            case EPIC -> 80;
-            case LEGENDARY -> 100;
+    /** 등급별 기본 효과 개수 */
+    private int getGradeEffectCount(EquipmentGrade grade) {
+        return switch (grade) {
+            case COMMON -> 0;
+            case UNCOMMON -> 1;
+            case RARE -> 2;
+            case EPIC -> 3;
+            case LEGENDARY -> 4;
         };
-        if (random.nextInt(100) >= chance) return null;
-
-        // 슬롯별 효과 풀에서 랜덤 선택
-        List<EquipmentEffect> pool = getEffectPool(type);
-        return pool.get(random.nextInt(pool.size()));
     }
 
-    private List<EquipmentEffect> getEffectPool(EquipmentType type) {
+    /** 장비에 기본 효과를 등급별 개수만큼 추가 (중복 방지) */
+    private void addBaseEffects(Equipment equipment, EquipmentType type, EquipmentGrade grade,
+                                int count, ThreadLocalRandom random) {
+        if (count <= 0) return;
+        List<EquipmentEffect> pool = getEffectPool(type);
+        java.util.Set<EquipmentEffect> used = new java.util.HashSet<>();
+
+        for (int i = 0; i < count && used.size() < pool.size(); i++) {
+            EquipmentEffect effect;
+            do {
+                effect = pool.get(random.nextInt(pool.size()));
+            } while (used.contains(effect));
+            used.add(effect);
+
+            equipment.getBaseEffects().add(BaseEffect.builder()
+                    .equipment(equipment)
+                    .effect(effect)
+                    .effectChance(getEffectChance(grade))
+                    .effectValue(getEffectValue(grade))
+                    .build());
+        }
+    }
+
+    /** 효과 풀 조회 (장비 타입별) - public for EnhanceService */
+    public List<EquipmentEffect> getEffectPool(EquipmentType type) {
         return switch (type) {
             case WEAPON -> WEAPON_EFFECTS;
             case HELMET, ARMOR, GLOVES, SHOES -> ARMOR_EFFECTS;
@@ -254,6 +272,62 @@ public class GachaService {
             case EPIC -> 4;
             case LEGENDARY -> 6;
         };
+    }
+
+    /** 장비 스탯 보너스 추가 */
+    private void addStatBonuses(Equipment equipment, EquipmentGrade grade, EquipmentType type, ThreadLocalRandom random) {
+        // 장갑/신발은 커먼도 보너스 스탯 부여
+        boolean forceStats = (type == EquipmentType.GLOVES || type == EquipmentType.SHOES);
+        if (!forceStats && grade.ordinal() < EquipmentGrade.UNCOMMON.ordinal()) return;
+
+        int count = switch (grade) {
+            case COMMON -> forceStats ? 1 : 0;
+            case UNCOMMON -> 1;
+            case RARE -> 1 + random.nextInt(2);   // 1-2
+            case EPIC -> 2 + random.nextInt(2);    // 2-3
+            case LEGENDARY -> 3 + random.nextInt(2); // 3-4
+        };
+        int maxValue = switch (grade) {
+            case COMMON -> 1;
+            case UNCOMMON -> 1;
+            case RARE -> 2;
+            case EPIC -> 3;
+            case LEGENDARY -> 4;
+        };
+
+        List<String> pool = getStatPool(type);
+        java.util.Set<String> used = new java.util.HashSet<>();
+
+        for (int i = 0; i < count && used.size() < pool.size(); i++) {
+            String stat;
+            do { stat = pool.get(random.nextInt(pool.size())); } while (used.contains(stat));
+            used.add(stat);
+            int value = 1 + random.nextInt(maxValue);
+            applyStat(equipment, stat, value);
+        }
+    }
+
+    private List<String> getStatPool(EquipmentType type) {
+        return switch (type) {
+            case WEAPON -> List.of("STR", "DEX", "INT");
+            case HELMET -> List.of("WIS", "INT", "CON");
+            case ARMOR -> List.of("CON", "STR", "CHA");
+            case GLOVES -> List.of("STR", "DEX");
+            case SHOES -> List.of("DEX", "CON");
+            case EARRING -> List.of("INT", "WIS", "CHA");
+            case RING -> List.of("STR", "DEX", "CON", "INT", "WIS", "CHA");
+        };
+    }
+
+    private void applyStat(Equipment eq, String stat, int value) {
+        switch (stat) {
+            case "STR" -> eq.setBonusStrength(eq.getBonusStrength() + value);
+            case "DEX" -> eq.setBonusDexterity(eq.getBonusDexterity() + value);
+            case "CON" -> eq.setBonusConstitution(eq.getBonusConstitution() + value);
+            case "INT" -> eq.setBonusIntelligence(eq.getBonusIntelligence() + value);
+            case "WIS" -> eq.setBonusWisdom(eq.getBonusWisdom() + value);
+            case "CHA" -> eq.setBonusCharisma(eq.getBonusCharisma() + value);
+        }
     }
 
     private String getGradePrefix(EquipmentGrade grade) {
