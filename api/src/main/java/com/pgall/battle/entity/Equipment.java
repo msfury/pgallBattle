@@ -4,6 +4,9 @@ import com.pgall.battle.enums.*;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "equipment")
 @Getter @Setter
@@ -54,7 +57,14 @@ public class Equipment {
     @Builder.Default
     private boolean equipped = false;
 
+    @Builder.Default
+    private int enhanceLevel = 0;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "character_id")
     private GameCharacter character;
+
+    @OneToMany(mappedBy = "equipment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<EnhanceEffect> enhanceEffects = new ArrayList<>();
 }

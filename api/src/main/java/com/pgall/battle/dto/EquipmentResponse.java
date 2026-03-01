@@ -26,6 +26,7 @@ public class EquipmentResponse {
     private boolean twoHanded;
     private int baseDamageMin;
     private int baseDamageMax;
+    private int enhanceLevel;
 
     public static EquipmentResponse from(Equipment e) {
         return EquipmentResponse.builder()
@@ -44,6 +45,7 @@ public class EquipmentResponse {
                 .twoHanded(e.isTwoHanded())
                 .baseDamageMin(e.getBaseDamageMin())
                 .baseDamageMax(e.getBaseDamageMax())
+                .enhanceLevel(e.getEnhanceLevel())
                 .build();
     }
 }

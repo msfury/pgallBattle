@@ -37,6 +37,29 @@ export interface Equipment {
   twoHanded: boolean;
   baseDamageMin: number;
   baseDamageMax: number;
+  enhanceLevel: number;
+}
+
+export interface EnhanceResult {
+  success: boolean;
+  broken: boolean;
+  newLevel: number;
+  cost: number;
+  message: string;
+  successRate: number;
+  breakChance: number;
+  nextStatBonus: number;
+}
+
+export interface InventoryItem {
+  id: number;
+  name: string;
+  description: string;
+  buffType: string | null;
+  quantity: number;
+  equipped: boolean;
+  buyPrice: number;
+  sellPrice: number;
 }
 
 export interface Character {
@@ -57,6 +80,7 @@ export interface Character {
   gold: number;
   eloRate: number;
   equipments: Equipment[];
+  potions: InventoryItem[];
 }
 
 export interface ShopPotionItem {
@@ -131,4 +155,16 @@ export const api = {
     request<Equipment>(`/characters/${characterId}/equipment/${equipmentId}/equip`, { method: 'PUT' }),
   unequipItem: (characterId: number, equipmentId: number) =>
     request<Equipment>(`/characters/${characterId}/equipment/${equipmentId}/unequip`, { method: 'PUT' }),
+  // 물약
+  equipPotion: (characterId: number, inventoryId: number) =>
+    request<{ success: boolean }>(`/characters/${characterId}/potion/${inventoryId}/equip`, { method: 'PUT' }),
+  unequipPotion: (characterId: number, inventoryId: number) =>
+    request<{ success: boolean }>(`/characters/${characterId}/potion/${inventoryId}/unequip`, { method: 'PUT' }),
+  sellPotion: (characterId: number, inventoryId: number) =>
+    request<{ soldPrice: number }>(`/characters/${characterId}/potion/${inventoryId}/sell`, { method: 'POST' }),
+  // 무기 강화
+  enhance: (characterId: number, equipmentId: number) =>
+    request<EnhanceResult>(`/characters/${characterId}/equipment/${equipmentId}/enhance`, { method: 'POST' }),
+  enhanceInfo: (characterId: number, equipmentId: number) =>
+    request<EnhanceResult>(`/characters/${characterId}/equipment/${equipmentId}/enhance-info`),
 };

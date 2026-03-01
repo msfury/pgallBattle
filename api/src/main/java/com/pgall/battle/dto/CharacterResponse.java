@@ -26,6 +26,7 @@ public class CharacterResponse {
     private int gold;
     private int eloRate;
     private List<EquipmentResponse> equipments;
+    private List<InventoryResponse> potions;
 
     public static CharacterResponse from(GameCharacter c) {
         return CharacterResponse.builder()
@@ -46,6 +47,9 @@ public class CharacterResponse {
                 .gold(c.getGold())
                 .eloRate(c.getEloRate())
                 .equipments(c.getEquipments().stream().map(EquipmentResponse::from).toList())
+                .potions(c.getInventories().stream()
+                        .filter(inv -> inv.getQuantity() > 0 && inv.getShopItem() != null)
+                        .map(InventoryResponse::from).toList())
                 .build();
     }
 }

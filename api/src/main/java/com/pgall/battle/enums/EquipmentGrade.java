@@ -9,7 +9,7 @@ public enum EquipmentGrade {
     COMMON(5),
     UNCOMMON(10),
     RARE(20),
-    EPIC(80),
+    EPIC(100),
     LEGENDARY(200);
 
     private final int sellPrice;

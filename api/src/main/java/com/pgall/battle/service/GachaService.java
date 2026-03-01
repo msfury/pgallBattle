@@ -75,6 +75,47 @@ public class GachaService {
         return equipmentRepository.save(equipment);
     }
 
+    /** 골드 차감 없이 특정 타입 + 최소 등급 보장 가챠 (용사 RARE+ 보장용) */
+    @Transactional
+    public Equipment pullFreeForTypeWithMinGrade(GameCharacter character, EquipmentType type, EquipmentGrade minGrade) {
+        EquipmentGrade grade;
+        do {
+            grade = rollGrade();
+        } while (grade.ordinal() < minGrade.ordinal());
+        Equipment equipment = generateEquipment(grade, type, character);
+        return equipmentRepository.save(equipment);
+    }
+
+    /** 골드 차감 없이 특정 무기 카테고리 + 최소 등급 보장 가챠 (용사 전용 무기용) */
+    @Transactional
+    public Equipment pullFreeForWeaponCategory(GameCharacter character, WeaponCategory category, EquipmentGrade minGrade) {
+        EquipmentGrade grade;
+        do {
+            grade = rollGrade();
+        } while (grade.ordinal() < minGrade.ordinal());
+
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        int gradeMultiplier = grade.ordinal() + 1;
+        String baseName = WeaponNameData.getRandomName(category, random);
+        String name = getGradePrefix(grade) + " " + baseName;
+        int dmgMin = category.getDiceCount() + (gradeMultiplier - 1);
+        int dmgMax = category.getDiceCount() * category.getDiceSides() + gradeMultiplier;
+        int atkBonus = gradeMultiplier * random.nextInt(1, 4);
+
+        Equipment.EquipmentBuilder builder = Equipment.builder()
+                .type(EquipmentType.WEAPON).grade(grade).character(character)
+                .name(name).attackBonus(atkBonus).defenseBonus(0)
+                .weaponCategory(category).scalingStat(category.getScalingStat())
+                .twoHanded(category.isTwoHanded())
+                .baseDamageMin(dmgMin).baseDamageMax(dmgMax);
+
+        EquipmentEffect effect = rollEffect(EquipmentType.WEAPON, grade);
+        if (effect != null) {
+            builder.effect(effect).effectChance(getEffectChance(grade)).effectValue(getEffectValue(grade));
+        }
+        return equipmentRepository.save(builder.build());
+    }
+
     private EquipmentGrade rollGrade() {
         int roll = ThreadLocalRandom.current().nextInt(100);
         if (roll < 1) return EquipmentGrade.LEGENDARY;

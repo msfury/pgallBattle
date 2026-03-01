@@ -25,14 +25,34 @@ public class CharacterService {
     private final InventoryRepository inventoryRepository;
     private final ShopItemRepository shopItemRepository;
 
+    private static final int STAT_TOTAL_LIMIT = 72;
+
     public RandomStatsResponse generateRandomStats() {
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+
+        // 0.01% 확률: 올스탯 20
+        if (random.nextInt(10000) == 0) {
+            return RandomStatsResponse.builder()
+                    .strength(20).dexterity(20).constitution(20)
+                    .intelligence(20).wisdom(20).charisma(20)
+                    .build();
+        }
+
+        // 총합 72 이하가 될 때까지 재굴림
+        int str, dex, con, intel, wis, cha, total;
+        do {
+            str = roll4d6DropLowest();
+            dex = roll4d6DropLowest();
+            con = roll4d6DropLowest();
+            intel = roll4d6DropLowest();
+            wis = roll4d6DropLowest();
+            cha = roll4d6DropLowest();
+            total = str + dex + con + intel + wis + cha;
+        } while (total > STAT_TOTAL_LIMIT);
+
         return RandomStatsResponse.builder()
-                .strength(roll4d6DropLowest())
-                .dexterity(roll4d6DropLowest())
-                .constitution(roll4d6DropLowest())
-                .intelligence(roll4d6DropLowest())
-                .wisdom(roll4d6DropLowest())
-                .charisma(roll4d6DropLowest())
+                .strength(str).dexterity(dex).constitution(con)
+                .intelligence(intel).wisdom(wis).charisma(cha)
                 .build();
     }
 
