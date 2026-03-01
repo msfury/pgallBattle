@@ -135,6 +135,28 @@ public class GachaService {
         return categories[ThreadLocalRandom.current().nextInt(categories.length)];
     }
 
+    /** 클래스별 선호무기 50% 보정 */
+    private WeaponCategory rollWeaponCategory(CharacterClass charClass) {
+        if (charClass == null || charClass == CharacterClass.WARRIOR) return rollWeaponCategory();
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        if (random.nextBoolean()) {
+            // 50% 선호무기 풀에서
+            List<WeaponCategory> preferred = getPreferredWeapons(charClass);
+            return preferred.get(random.nextInt(preferred.size()));
+        }
+        return rollWeaponCategory();
+    }
+
+    private List<WeaponCategory> getPreferredWeapons(CharacterClass charClass) {
+        return switch (charClass) {
+            case ROGUE -> List.of(WeaponCategory.DAGGER, WeaponCategory.CLAW, WeaponCategory.RAPIER);
+            case MAGE -> List.of(WeaponCategory.STAFF, WeaponCategory.WAND);
+            case RANGER -> List.of(WeaponCategory.BOW);
+            case CLERIC -> List.of(WeaponCategory.MACE, WeaponCategory.FLAIL, WeaponCategory.WAND);
+            case WARRIOR -> List.of(WeaponCategory.values());
+        };
+    }
+
     private Equipment generateEquipment(EquipmentGrade grade, EquipmentType type, GameCharacter character) {
         ThreadLocalRandom random = ThreadLocalRandom.current();
         int gradeMultiplier = grade.ordinal() + 1;
@@ -150,7 +172,7 @@ public class GachaService {
 
         switch (type) {
             case WEAPON -> {
-                WeaponCategory category = rollWeaponCategory();
+                WeaponCategory category = rollWeaponCategory(character.getCharacterClass());
                 String baseName = WeaponNameData.getRandomName(category, random);
                 name = getGradePrefix(grade) + " " + baseName;
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, type Stats } from '../api/client';
-import { CLASSES } from '../data/classes';
+import { CLASSES, CLASS_TOOLTIP } from '../data/classes';
 import { getAvatarsForClass } from '../data/avatars';
 import SpriteAvatar from '../components/SpriteAvatar';
 
@@ -77,6 +77,11 @@ export default function CharacterCreatePage() {
               <div style={{ fontSize: '1.3rem' }}>{c.emoji}</div>
               <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: c.color }}>{c.name}</div>
               <div style={{ fontSize: '0.65rem', color: '#999', marginTop: 2 }}>{c.desc}</div>
+              {CLASS_TOOLTIP[c.key] && (
+                <div style={{ fontSize: '0.6rem', color: '#777', marginTop: 4, whiteSpace: 'pre-line', lineHeight: 1.4 }}>
+                  {CLASS_TOOLTIP[c.key]}
+                </div>
+              )}
             </div>
           ))}
         </div>

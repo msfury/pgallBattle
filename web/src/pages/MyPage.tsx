@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, type Character, type Equipment, type InventoryItem, type EnhanceResult, type EffectOption } from '../api/client';
-import { CLASS_EMOJI, CLASS_COLOR } from '../data/classes';
+import { CLASS_EMOJI, CLASS_COLOR, CLASS_TOOLTIP } from '../data/classes';
 import SpriteAvatar from '../components/SpriteAvatar';
 
 const SELL_PRICE: Record<string, number> = {
@@ -40,6 +40,69 @@ const EFFECT_NAMES: Record<string, string> = {
   PIERCING_GAZE: '꿰뚫는 시선', SOUL_HARVEST: '영혼 수확', ARCANE_FOCUS: '비전 집중',
   DIVINE_FAVOR: '신의 은총', CHAOS_STRIKE: '혼돈 일격', ELEMENTAL_BOOST: '원소 강화',
   SPIRIT_LINK: '영혼 연결', MANA_DRAIN: '마나 흡수',
+};
+
+const EFFECT_TOOLTIPS: Record<string, string> = {
+  FIRE_DAMAGE: '확률적으로 화염 추가 데미지',
+  ICE_DAMAGE: '확률적으로 빙결 추가 데미지',
+  LIGHTNING_DAMAGE: '확률적으로 번개 추가 데미지',
+  HOLY_DAMAGE: '확률적으로 신성 추가 데미지',
+  DARK_DAMAGE: '확률적으로 암흑 추가 데미지',
+  ACID_DAMAGE: '확률적으로 산성 추가 데미지',
+  ARMOR_PENETRATION: '상대 AC를 무시하여 관통',
+  BLEEDING: '확률적으로 출혈 부여 (매 라운드 2 데미지)',
+  LIFE_STEAL: '공격 시 확률적으로 HP 흡수',
+  DOUBLE_ATTACK: '확률적으로 2회 연속 공격',
+  CRITICAL_BOOST: '크리티컬 범위 확장 (18+)',
+  STUN_STRIKE: '확률적으로 기절 (1턴 행동불가)',
+  KNOCKBACK: '확률적으로 넉백 (명중률 감소)',
+  VORPAL: '크리티컬 시 추가 50% 데미지',
+  DEBUFF_ATK_DOWN: '전투 시작 시 상대 공격력 감소',
+  DEBUFF_DEF_DOWN: '전투 시작 시 상대 방어력 감소',
+  SLOW: '확률적으로 속도 감소 (행동 지연)',
+  SILENCE: '확률적으로 침묵 (마법 데미지 차단)',
+  DISARM: '확률적으로 무장 해제 (데미지 1 고정)',
+  EXECUTE: 'HP 20% 이하 시 30% 확률 즉사',
+  BLOCK_CHANCE: '확률적으로 공격 차단',
+  MAGIC_RESISTANCE: '마법 데미지 50% 감소',
+  THORNS: '피격 시 반사 데미지',
+  HP_REGEN: '매 라운드 HP 재생',
+  DAMAGE_REDUCTION: '받는 데미지 고정 감소',
+  DODGE_BOOST: '회피율(AC) 증가',
+  FIRE_RESISTANCE: '화염 데미지 50% 감소',
+  ICE_RESISTANCE: '빙결 데미지 50% 감소',
+  LIGHTNING_RESISTANCE: '번개 데미지 50% 감소',
+  POISON_RESISTANCE: '독 데미지 면역',
+  STUN_RESISTANCE: '기절 면역',
+  REFLECT_MAGIC: '확률적으로 마법 데미지 25% 반사',
+  SECOND_WIND: 'HP 0 시 1회 HP 1로 부활',
+  HEAVY_ARMOR: '받는 데미지 고정 감소',
+  ENDURANCE: '전투 시작 시 최대HP 증가',
+  PERSEVERANCE: '기절 면역',
+  IRON_SKIN: '받는 데미지 15% 감소',
+  HEALING_AURA: '매 라운드 HP 1 회복',
+  ABSORB_SHIELD: '전투 시작 시 데미지 흡수 보호막',
+  FORTIFY: 'AC 증가',
+  ACCURACY_UP: '명중률 증가',
+  COUNTER_ATTACK: '확률적으로 50% 데미지 반격',
+  POISON: '확률적으로 독 데미지',
+  CURSE_WEAKNESS: '전투 시작 시 상대 데미지 30% 감소',
+  MANA_SHIELD: '확률적으로 데미지 흡수',
+  HASTE: '이니셔티브 +5, 30% 추가 공격',
+  LUCK: '크리티컬 범위 확장 (19+)',
+  VAMPIRIC_AURA: '공격 적중 시 데미지의 20% HP 흡수',
+  DEATH_WARD: 'HP 0 시 1회 즉사 방지',
+  INTIMIDATE: '전투 시작 시 상대 위축 (공격력 감소)',
+  BLESS: '명중률 +2, 전체 능력 강화',
+  EVASION: '확률적으로 완전 회피',
+  PIERCING_GAZE: '명중률 증가',
+  SOUL_HARVEST: '전투 승리 시 HP +5',
+  ARCANE_FOCUS: '원소 데미지 25% 증가',
+  DIVINE_FAVOR: '확률적으로 신성 추가 데미지 +2',
+  CHAOS_STRIKE: '확률적으로 1~7 랜덤 추가 데미지',
+  ELEMENTAL_BOOST: '원소 데미지 33% 증가',
+  SPIRIT_LINK: '매 라운드 HP 1 회복',
+  MANA_DRAIN: '확률적으로 상대 약화',
 };
 
 const TYPE_EMOJI: Record<string, string> = {
@@ -326,16 +389,17 @@ export default function MyPage() {
       ...(eq.enhanceEffects || []).map(e => ({ ...e, source: 'enhance' as const })),
     ];
     if (eq.effect && !allEffects.length) {
-      // 레거시 단일 효과
       return (
-        <div style={{ fontSize: '0.6rem', color: '#f39c12' }}>
+        <div className="tooltip-wrap" style={{ fontSize: '0.6rem', color: '#f39c12' }}>
           [{EFFECT_NAMES[eq.effect] || eq.effect} {eq.effectChance}%]
+          {EFFECT_TOOLTIPS[eq.effect] && <span className="tooltip-text">{EFFECT_TOOLTIPS[eq.effect]}</span>}
         </div>
       );
     }
     return allEffects.map((e, i) => (
-      <div key={i} style={{ fontSize: '0.6rem', color: e.source === 'enhance' ? '#e74c3c' : '#f39c12' }}>
+      <div key={i} className="tooltip-wrap" style={{ fontSize: '0.6rem', color: e.source === 'enhance' ? '#e74c3c' : '#f39c12' }}>
         [{EFFECT_NAMES[e.effect] || e.effect} {e.effectChance}%]{e.source === 'enhance' ? ' +강화' : ''}
+        {EFFECT_TOOLTIPS[e.effect] && <span className="tooltip-text">{EFFECT_TOOLTIPS[e.effect]}</span>}
       </div>
     ));
   };
@@ -391,8 +455,11 @@ export default function MyPage() {
             <div style={{ fontSize: '0.85rem', color: '#999' }}>
               Lv.{char.level}
               {char.characterClass && (
-                <span style={{ color: CLASS_COLOR[char.characterClass] || '#999', marginLeft: 6 }}>
+                <span className="tooltip-wrap" style={{ color: CLASS_COLOR[char.characterClass] || '#999', marginLeft: 6 }}>
                   {CLASS_EMOJI[char.characterClass]} {char.classKoreanName}
+                  {CLASS_TOOLTIP[char.characterClass] && (
+                    <span className="tooltip-text">{CLASS_TOOLTIP[char.characterClass]}</span>
+                  )}
                 </span>
               )}
             </div>
