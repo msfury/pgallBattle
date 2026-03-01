@@ -696,7 +696,11 @@ public class BattleService {
             case MAGE -> (weapon != null && weapon.getWeaponCategory() != null
                     && weapon.getWeaponCategory().isMagical()) ? 3 : 0;
             case RANGER -> (weapon != null && weapon.getWeaponCategory() == WeaponCategory.BOW) ? 2 : 0;
-            case CLERIC -> 0;
+            case CLERIC -> (weapon != null && weapon.getWeaponCategory() != null
+                    && (weapon.getWeaponCategory() == WeaponCategory.MACE
+                    || weapon.getWeaponCategory() == WeaponCategory.FLAIL
+                    || weapon.getWeaponCategory() == WeaponCategory.WAND))
+                    ? 1 + mod(atk.getWisdom()) : 0;
         };
     }
 
