@@ -168,6 +168,7 @@ export default function MyPage() {
   const [currentEnhanceEffects, setCurrentEnhanceEffects] = useState<EffectOption[]>([]);
   const [maxEnhanceEffects, setMaxEnhanceEffects] = useState(0);
   const [selectedEffects, setSelectedEffects] = useState<Set<string>>(new Set());
+  const [enhanceBroken, setEnhanceBroken] = useState(false);
 
   const loadChar = useCallback(() => api.getCharacter(myId).then(setChar).catch(e => {
     setError(e instanceof Error ? e.message : '로딩 실패');
@@ -326,6 +327,7 @@ export default function MyPage() {
     setEnhanceInfo(null);
     setEffectSelectionMode(false);
     setSelectedEffects(new Set());
+    setEnhanceBroken(false);
   };
 
   const handleEnhance = async () => {
@@ -334,8 +336,14 @@ export default function MyPage() {
       setError('');
       const result = await api.enhance(myId, enhanceTarget.id);
       if (result.broken) {
-        setToast(result.message);
-        closeEnhanceModal();
+        setEnhanceBroken(true);
+        await loadChar();
+        setTimeout(() => {
+          closeEnhanceModal();
+          setToast(result.message);
+          setTimeout(() => setToast(''), 3000);
+        }, 2000);
+        return;
       } else if (result.success) {
         setToast(result.message);
         // 효과 선택이 필요한 경우
@@ -800,8 +808,34 @@ export default function MyPage() {
 
       {/* ===== 강화 모달 ===== */}
       {enhanceModalOpen && enhanceTarget && enhanceInfo && (
-        <div className="modal-overlay" onClick={closeEnhanceModal}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={enhanceBroken ? undefined : closeEnhanceModal}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}
+            style={enhanceBroken ? { animation: 'enhance-shake 0.5s ease-in-out' } : undefined}>
+
+            {/* 파괴 이펙트 오버레이 */}
+            {enhanceBroken && (
+              <div style={{
+                position: 'absolute', inset: 0, zIndex: 10, borderRadius: 12, overflow: 'hidden',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(0,0,0,0.85)',
+                animation: 'enhance-break-in 0.3s ease-out',
+              }}>
+                <div style={{
+                  fontSize: '3rem',
+                  animation: 'enhance-crack 0.6s ease-out 0.2s both',
+                }}>💥</div>
+                <div style={{
+                  fontSize: '1.3rem', fontWeight: 'bold', color: '#e74c3c', marginTop: 12,
+                  animation: 'enhance-crack 0.6s ease-out 0.4s both',
+                  textShadow: '0 0 20px rgba(231,76,60,0.8)',
+                }}>장비가 파괴되었습니다!</div>
+                <div style={{
+                  fontSize: '0.9rem', color: '#999', marginTop: 8,
+                  animation: 'enhance-crack 0.6s ease-out 0.6s both',
+                }}>{enhanceTarget.name}</div>
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <h2 style={{ margin: 0 }}>🔨 장비 강화</h2>
               <button onClick={closeEnhanceModal} style={{
