@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { CLASS_COLOR } from '../data/classes';
 import type { PotionInfo } from '../api/client';
 import SpriteAvatar from './SpriteAvatar';
-
-type AnimationType = 'idle' | 'walk' | 'attack' | 'hit' | 'death';
+import type { AnimationType } from './SpriteAvatar';
 
 interface BattleArenaProps {
   attackerAvatar: string | null;
@@ -132,24 +131,28 @@ export default function BattleArena({
       currentLog.includes('데미지를 입') || currentLog.includes('공격');
     const isMissLog = currentLog.includes('빗나감') || currentLog.includes('차단') || currentLog.includes('회피');
 
+    const MAGIC_CLASSES = ['MAGE', 'CLERIC'];
+    const leftAttackAnim: AnimationType = MAGIC_CLASSES.includes(attackerClass || '') ? 'magicAttack' : 'attack';
+    const rightAttackAnim: AnimationType = MAGIC_CLASSES.includes(defenderClass || '') ? 'magicAttack' : 'attack';
+
     if (isAttackLog) {
       if (attackerActing) {
-        setLeftAnim('attack');
+        setLeftAnim(leftAttackAnim);
         setLeftPaused(false);
         setRightAnim('hit');
         setRightPaused(false);
       } else if (defenderActing) {
-        setRightAnim('attack');
+        setRightAnim(rightAttackAnim);
         setRightPaused(false);
         setLeftAnim('hit');
         setLeftPaused(false);
       }
     } else if (isMissLog) {
       if (attackerActing) {
-        setLeftAnim('attack');
+        setLeftAnim(leftAttackAnim);
         setLeftPaused(false);
       } else if (defenderActing) {
-        setRightAnim('attack');
+        setRightAnim(rightAttackAnim);
         setRightPaused(false);
       }
     } else {
